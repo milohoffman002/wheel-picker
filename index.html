@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wheel Picker</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151a21;
+      --panel-2: #0f141b;
+      --text: #e9eef5;
+      --muted: #95a3b9;
+      --accent: #2ee6a6;
+      --danger: #ff5370;
+      --shadow: 0 20px 60px rgba(0,0,0,0.45);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(70,120,255,0.2), transparent 60%),
+        radial-gradient(900px 500px at -10% 10%, rgba(46,230,166,0.22), transparent 60%),
+        linear-gradient(180deg, #0c0f14 0%, #0f1115 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 32px 20px 60px;
+    }
+
+    .app {
+      width: min(1200px, 100%);
+      display: grid;
+      gap: 24px;
+      grid-template-columns: 1fr;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 2.6vw, 2.6rem);
+      letter-spacing: 0.5px;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .layout {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: 1fr;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .inputs {
+      display: grid;
+      gap: 16px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      background: var(--panel-2);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 14px;
+      color: var(--text);
+      font-size: 1rem;
+      resize: vertical;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: rgba(46,230,166,0.6);
+      box-shadow: 0 0 0 2px rgba(46,230,166,0.2);
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 20px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+    }
+
+    button:active { transform: translateY(1px) scale(0.99); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #07130f;
+      box-shadow: 0 10px 24px rgba(46,230,166,0.3);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .btn-danger {
+      background: rgba(255,83,112,0.12);
+      color: #ff7a90;
+      border: 1px solid rgba(255,83,112,0.4);
+    }
+
+    .wheel-panel {
+      display: grid;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .wheel-wrap {
+      position: relative;
+      width: min(520px, 90vw);
+      aspect-ratio: 1;
+      margin: 0 auto;
+    }
+
+    .wheel {
+      width: 100%;
+      height: 100%;
+      transform-origin: 50% 50%;
+      filter: drop-shadow(0 15px 30px rgba(0,0,0,0.5));
+      transition: transform 0.2s ease-out;
+    }
+
+    .pointer {
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-bottom: 32px solid #f9f1a7;
+      filter: drop-shadow(0 4px 12px rgba(249,241,167,0.4));
+    }
+
+    .winner {
+      text-align: center;
+      padding: 14px 18px;
+      border-radius: 16px;
+      background: rgba(46,230,166,0.12);
+      border: 1px solid rgba(46,230,166,0.45);
+      font-size: 1.2rem;
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .winner span {
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .items-list {
+      display: grid;
+      gap: 8px;
+      max-height: 260px;
+      overflow: auto;
+      padding-right: 6px;
+    }
+
+    .item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+    }
+
+    .item button {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border-radius: 999px;
+    }
+
+    .spin-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .spin-btn {
+      background: linear-gradient(135deg, #2ee6a6, #44a1ff);
+      color: #04101b;
+      font-size: 1.05rem;
+      padding: 14px 26px;
+      box-shadow: 0 16px 36px rgba(68,161,255,0.3);
+    }
+
+    @media (min-width: 900px) {
+      .layout {
+        grid-template-columns: 340px 1fr;
+        align-items: start;
+      }
+
+      .wheel-panel {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    .winner.glow {
+      animation: pulse 0.9s ease-in-out 2;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Wheel Picker</h1>
+        <p>Drop in your options, spin, and let the wheel decide.</p>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section class="panel inputs">
+        <div>
+          <label for="items" style="font-weight:600;">Items (one per line)</label>
+          <textarea id="items" placeholder="Pizza\nSushi\nTacos\nPasta"></textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" id="addBtn">Add to Wheel</button>
+          <button class="btn-outline" id="shuffleBtn">Shuffle Colors</button>
+          <button class="btn-danger" id="clearBtn">Clear All</button>
+        </div>
+        <div>
+          <div style="font-weight:600; margin-bottom:8px;">Items on Wheel</div>
+          <div class="items-list" id="itemsList"></div>
+        </div>
+      </section>
+
+      <section class="panel wheel-panel">
+        <div class="wheel-wrap">
+          <div class="pointer"></div>
+          <svg id="wheel" class="wheel" viewBox="0 0 200 200" aria-label="Wheel"></svg>
+        </div>
+        <div class="spin-row">
+          <button class="spin-btn" id="spinBtn">Spin the Wheel</button>
+        </div>
+        <div class="winner" id="winner">Winner: <span>—</span></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const itemsInput = document.getElementById("items");
+    const addBtn = document.getElementById("addBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const shuffleBtn = document.getElementById("shuffleBtn");
+    const itemsList = document.getElementById("itemsList");
+    const wheel = document.getElementById("wheel");
+    const spinBtn = document.getElementById("spinBtn");
+    const winnerEl = document.getElementById("winner");
+
+    let items = [];
+    let rotation = 0;
+    let spinning = false;
+
+    const palette = [
+      "#ff6b6b", "#feca57", "#54a0ff", "#5f27cd", "#1dd1a1",
+      "#ff9f43", "#48dbfb", "#c8d6e5", "#f368e0", "#00d2d3",
+      "#ff9ff3", "#00b894", "#6c5ce7", "#fd79a8", "#e17055"
+    ];
+
+    function randomColors(count) {
+      const colors = [];
+      for (let i = 0; i < count; i += 1) {
+        colors.push(palette[i % palette.length]);
+      }
+      for (let i = colors.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [colors[i], colors[j]] = [colors[j], colors[i]];
+      }
+      return colors;
+    }
+
+    let segmentColors = [];
+
+    function addItemsFromInput() {
+      const newItems = itemsInput.value
+        .split("\n")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+
+      if (newItems.length === 0) return;
+
+      items = [...items, ...newItems];
+      itemsInput.value = "";
+      segmentColors = randomColors(items.length);
+      render();
+    }
+
+    function clearItems() {
+      items = [];
+      rotation = 0;
+      segmentColors = [];
+      render();
+      updateWinner("—");
+    }
+
+    function removeItem(index) {
+      items.splice(index, 1);
+      segmentColors = randomColors(items.length);
+      render();
+    }
+
+    function shuffleColors() {
+      segmentColors = randomColors(items.length);
+      render();
+    }
+
+    function updateWinner(text) {
+      winnerEl.innerHTML = `Winner: <span>${text}</span>`;
+      winnerEl.classList.remove("glow");
+      void winnerEl.offsetWidth;
+      winnerEl.classList.add("glow");
+    }
+
+    function polarToCartesian(cx, cy, r, angle) {
+      const rad = (angle - 90) * Math.PI / 180.0;
+      return {
+        x: cx + r * Math.cos(rad),
+        y: cy + r * Math.sin(rad)
+      };
+    }
+
+    function describeArc(cx, cy, r, startAngle, endAngle) {
+      const start = polarToCartesian(cx, cy, r, endAngle);
+      const end = polarToCartesian(cx, cy, r, startAngle);
+      const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+      return [
+        "M", cx, cy,
+        "L", start.x, start.y,
+        "A", r, r, 0, largeArcFlag, 0, end.x, end.y,
+        "Z"
+      ].join(" ");
+    }
+
+    function renderWheel() {
+      wheel.innerHTML = "";
+      if (items.length === 0) {
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", "100");
+        circle.setAttribute("cy", "100");
+        circle.setAttribute("r", "95");
+        circle.setAttribute("fill", "#1b2230");
+        circle.setAttribute("stroke", "rgba(255,255,255,0.1)");
+        circle.setAttribute("stroke-width", "2");
+        wheel.appendChild(circle);
+        return;
+      }
+
+      const segmentAngle = 360 / items.length;
+      const colors = segmentColors.length === items.length
+        ? segmentColors
+        : randomColors(items.length);
+
+      items.forEach((label, index) => {
+        const startAngle = index * segmentAngle;
+        const endAngle = startAngle + segmentAngle;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", describeArc(100, 100, 95, startAngle, endAngle));
+        path.setAttribute("fill", colors[index]);
+        path.setAttribute("stroke", "rgba(0,0,0,0.2)");
+        path.setAttribute("stroke-width", "1");
+
+        const textAngle = startAngle + segmentAngle / 2;
+        const textPos = polarToCartesian(100, 100, 60, textAngle);
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", textPos.x.toFixed(2));
+        text.setAttribute("y", textPos.y.toFixed(2));
+        text.setAttribute("fill", "#0b0f14");
+        text.setAttribute("font-size", "8");
+        text.setAttribute("font-weight", "700");
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dominant-baseline", "middle");
+        text.setAttribute("transform", `rotate(${textAngle} ${textPos.x.toFixed(2)} ${textPos.y.toFixed(2)})`);
+        text.textContent = label.length > 16 ? label.slice(0, 16) + "…" : label;
+
+        wheel.appendChild(path);
+        wheel.appendChild(text);
+      });
+
+      const center = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      center.setAttribute("cx", "100");
+      center.setAttribute("cy", "100");
+      center.setAttribute("r", "14");
+      center.setAttribute("fill", "#0b0f14");
+      center.setAttribute("stroke", "rgba(255,255,255,0.3)");
+      center.setAttribute("stroke-width", "2");
+      wheel.appendChild(center);
+    }
+
+    function renderList() {
+      itemsList.innerHTML = "";
+      if (items.length === 0) {
+        const empty = document.createElement("div");
+        empty.style.color = "var(--muted)";
+        empty.textContent = "No items yet.";
+        itemsList.appendChild(empty);
+        return;
+      }
+
+      items.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "item";
+
+        const name = document.createElement("span");
+        name.textContent = item;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn-danger";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", () => removeItem(index));
+
+        row.appendChild(name);
+        row.appendChild(removeBtn);
+        itemsList.appendChild(row);
+      });
+    }
+
+    function render() {
+      renderWheel();
+      renderList();
+      wheel.style.transform = `rotate(${rotation}deg)`;
+    }
+
+    function spinWheel() {
+      if (spinning || items.length === 0) return;
+      spinning = true;
+      spinBtn.disabled = true;
+      spinBtn.textContent = "Spinning...";
+
+      const segmentAngle = 360 / items.length;
+      const extraSpins = 5 + Math.random() * 3;
+      const targetIndex = Math.floor(Math.random() * items.length);
+      const targetAngle = 360 - (targetIndex * segmentAngle + segmentAngle / 2);
+      const totalRotation = rotation + extraSpins * 360 + targetAngle + (Math.random() * segmentAngle * 0.4 - segmentAngle * 0.2);
+
+      const duration = 5200 + Math.random() * 1200;
+      const start = performance.now();
+      const initialRotation = rotation;
+
+      function easeOutCubic(t) {
+        return 1 - Math.pow(1 - t, 3);
+      }
+
+      function animate(now) {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = easeOutCubic(progress);
+        rotation = initialRotation + (totalRotation - initialRotation) * eased;
+        wheel.style.transform = `rotate(${rotation}deg)`;
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          spinning = false;
+          spinBtn.disabled = false;
+          spinBtn.textContent = "Spin the Wheel";
+
+          const normalized = ((rotation % 360) + 360) % 360;
+          const winnerIndex = Math.floor(((360 - normalized + segmentAngle / 2) % 360) / segmentAngle) % items.length;
+          updateWinner(items[winnerIndex]);
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    addBtn.addEventListener("click", addItemsFromInput);
+    clearBtn.addEventListener("click", clearItems);
+    shuffleBtn.addEventListener("click", shuffleColors);
+    spinBtn.addEventListener("click", spinWheel);
+
+    render();
+  </script>
+</body>
+</html>
