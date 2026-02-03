@@ -367,12 +367,22 @@
           isSpinning = false;
           document.getElementById('spinBtn').disabled = false;
           
-          // Calculate winner
+          // Calculate winner - which segment is under the pointer at top (3*PI/2)
           const normalizedRotation = (rotation % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
           const anglePerItem = (Math.PI * 2) / items.length;
-          // Pointer is at -PI/2 (top), so we need to account for that
-          const pointerAngle = (Math.PI * 1.5 - normalizedRotation + Math.PI * 2) % (Math.PI * 2);
-          const winnerIndex = Math.floor(pointerAngle / anglePerItem) % items.length;
+          
+          // The pointer is at 3*PI/2 (top)
+          // After rotating by normalizedRotation, find which original segment is now at top
+          // Segment i spans from i*anglePerItem to (i+1)*anglePerItem originally
+          // After rotation, it's at i*anglePerItem + normalizedRotation to (i+1)*anglePerItem + normalizedRotation
+          // We want i where: i*anglePerItem + normalizedRotation <= 3*PI/2 < (i+1)*anglePerItem + normalizedRotation
+          // Solving: i <= (3*PI/2 - normalizedRotation) / anglePerItem < i+1
+          
+          let relativeAngle = (3 * Math.PI / 2 - normalizedRotation) % (Math.PI * 2);
+          if (relativeAngle < 0) relativeAngle += Math.PI * 2;
+          
+          // Add small epsilon to handle floating point edge cases
+          const winnerIndex = Math.floor((relativeAngle + 0.0001) / anglePerItem) % items.length;
           
           document.getElementById('winner').textContent = items[winnerIndex];
         }
