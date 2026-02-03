@@ -13,15 +13,38 @@
       min-height: 100vh;
       padding: 20px;
     }
+    body.fullscreen {
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
     .container {
       max-width: 900px;
       margin: 0 auto;
     }
+    body.fullscreen .container {
+      max-width: 100%;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
     h1 { text-align: center; margin-bottom: 10px; }
     .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+    body.fullscreen h1,
+    body.fullscreen .subtitle { display: none; }
     .layout {
       display: grid;
       grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+    body.fullscreen .layout {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       gap: 30px;
     }
     @media (max-width: 700px) {
@@ -31,6 +54,13 @@
       background: rgba(255,255,255,0.05);
       border-radius: 16px;
       padding: 20px;
+    }
+    body.fullscreen .panel:first-child { display: none; }
+    body.fullscreen .panel {
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     label {
       display: block;
@@ -111,6 +141,12 @@
       height: 300px;
       margin-bottom: 20px;
     }
+    body.fullscreen .wheel-wrapper {
+      width: min(70vh, 70vw);
+      height: min(70vh, 70vw);
+      max-width: 600px;
+      max-height: 600px;
+    }
     .pointer {
       position: absolute;
       top: -10px;
@@ -128,12 +164,17 @@
       width: 100%;
       height: 100%;
     }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
     .spin-btn {
       padding: 14px 40px;
       font-size: 18px;
       background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
       color: #fff;
-      margin-bottom: 20px;
     }
     .spin-btn:disabled {
       opacity: 0.5;
@@ -146,10 +187,56 @@
       border: 1px solid rgba(78, 205, 196, 0.3);
       border-radius: 12px;
       font-size: 18px;
+      min-width: 200px;
     }
     .winner span {
       font-weight: 700;
       color: #4ecdc4;
+    }
+    body.fullscreen .winner {
+      font-size: 24px;
+      padding: 20px 40px;
+    }
+    .fullscreen-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #fff;
+      display: none;
+    }
+    body:not(.fullscreen) .panel .fullscreen-btn { display: block; }
+    .exit-fullscreen {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #fff;
+      z-index: 100;
+      display: none;
+    }
+    body.fullscreen .exit-fullscreen { display: block; }
+    .sound-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #888;
+      cursor: pointer;
+    }
+    .sound-toggle input {
+      cursor: pointer;
     }
   </style>
 </head>
@@ -173,37 +260,87 @@
           <h3>Items on Wheel</h3>
           <div id="itemsList"></div>
         </div>
+        
+        <label class="sound-toggle">
+          <input type="checkbox" id="soundToggle" checked>
+          Enable clicking sound
+        </label>
       </div>
       
       <div class="panel wheel-container">
+        <button class="fullscreen-btn" onclick="toggleFullscreen()">⛶ Full Screen</button>
         <div class="wheel-wrapper">
           <div class="pointer"></div>
-          <canvas id="wheel" width="300" height="300"></canvas>
+          <canvas id="wheel" width="600" height="600"></canvas>
         </div>
         
-        <button class="spin-btn" id="spinBtn" onclick="spin()">Spin the Wheel</button>
-        
-        <div class="winner">
-          Winner: <span id="winner">—</span>
+        <div class="controls">
+          <button class="spin-btn" id="spinBtn" onclick="spin()">Spin the Wheel</button>
+          
+          <div class="winner">
+            Winner: <span id="winner">—</span>
+          </div>
         </div>
       </div>
     </div>
   </div>
+  
+  <button class="exit-fullscreen" onclick="toggleFullscreen()">✕ Exit Full Screen</button>
 
   <script>
     let items = [];
     let colors = [];
     let rotation = 0;
     let isSpinning = false;
+    let audioContext = null;
     
     const canvas = document.getElementById('wheel');
     const ctx = canvas.getContext('2d');
+    const size = canvas.width;
+    const center = size / 2;
+    const radius = center - 10;
     
     const palette = [
       '#ff6b6b', '#feca57', '#54a0ff', '#5f27cd', '#1dd1a1',
       '#ff9f43', '#48dbfb', '#ff9ff3', '#00b894', '#6c5ce7',
       '#fd79a8', '#e17055', '#74b9ff', '#a29bfe', '#00cec9'
     ];
+    
+    // Initialize audio context on first user interaction
+    function initAudio() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+    }
+    
+    // Create a clicking sound
+    function playClick() {
+      if (!document.getElementById('soundToggle').checked) return;
+      if (!audioContext) initAudio();
+      
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.frequency.setValueAtTime(800, audioContext.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.05);
+      
+      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.start(audioContext.currentTime);
+      osc.stop(audioContext.currentTime + 0.05);
+    }
+    
+    function toggleFullscreen() {
+      document.body.classList.toggle('fullscreen');
+      drawWheel();
+    }
     
     function addItems() {
       const input = document.getElementById('itemInput');
@@ -273,11 +410,11 @@
     }
     
     function drawWheel() {
-      ctx.clearRect(0, 0, 300, 300);
+      ctx.clearRect(0, 0, size, size);
       
       if (items.length === 0) {
         ctx.beginPath();
-        ctx.arc(150, 150, 140, 0, Math.PI * 2);
+        ctx.arc(center, center, radius, 0, Math.PI * 2);
         ctx.fillStyle = '#1a1a2e';
         ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -286,23 +423,20 @@
         return;
       }
       
-      const centerX = 150;
-      const centerY = 150;
-      const radius = 140;
       const anglePerItem = (Math.PI * 2) / items.length;
       
       ctx.save();
-      ctx.translate(centerX, centerY);
+      ctx.translate(center, center);
       ctx.rotate(rotation);
-      ctx.translate(-centerX, -centerY);
+      ctx.translate(-center, -center);
       
       items.forEach((item, i) => {
         const startAngle = i * anglePerItem;
         const endAngle = startAngle + anglePerItem;
         
         ctx.beginPath();
-        ctx.moveTo(centerX, centerY);
-        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, startAngle, endAngle);
         ctx.closePath();
         ctx.fillStyle = colors[i] || '#666';
         ctx.fill();
@@ -312,17 +446,18 @@
         
         // Text
         const textAngle = startAngle + anglePerItem / 2;
-        const textX = centerX + Math.cos(textAngle) * (radius * 0.65);
-        const textY = centerY + Math.sin(textAngle) * (radius * 0.65);
+        const textDist = radius * 0.65;
+        const textX = center + Math.cos(textAngle) * textDist;
+        const textY = center + Math.sin(textAngle) * textDist;
         
         ctx.save();
         ctx.translate(textX, textY);
         ctx.rotate(textAngle + Math.PI / 2);
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px sans-serif';
+        ctx.font = 'bold 16px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const displayText = item.length > 12 ? item.substring(0, 12) + '...' : item;
+        const displayText = item.length > 14 ? item.substring(0, 14) + '...' : item;
         ctx.fillText(displayText, 0, 0);
         ctx.restore();
       });
@@ -331,33 +466,65 @@
       
       // Center circle
       ctx.beginPath();
-      ctx.arc(centerX, centerY, 20, 0, Math.PI * 2);
+      ctx.arc(center, center, 25, 0, Math.PI * 2);
       ctx.fillStyle = '#1a1a2e';
       ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 4;
       ctx.stroke();
     }
     
     function spin() {
       if (isSpinning || items.length < 2) return;
       
+      initAudio();
       isSpinning = true;
       document.getElementById('spinBtn').disabled = true;
+      document.getElementById('winner').textContent = '—';
       
-      const spins = 5 + Math.random() * 5;
-      const targetRotation = rotation + spins * Math.PI * 2;
-      const duration = 4000;
+      const minSpins = 5;
+      const maxSpins = 8;
+      const totalSpins = minSpins + Math.random() * (maxSpins - minSpins);
+      const targetRotation = rotation + totalSpins * Math.PI * 2;
+      const duration = 6000; // 6 seconds for drama
       const start = Date.now();
       const startRotation = rotation;
+      
+      // Track clicks - one per segment pass
+      let lastClickSegment = -1;
       
       function animate() {
         const elapsed = Date.now() - start;
         const progress = Math.min(elapsed / duration, 1);
         
-        // Easing
-        const easeOut = 1 - Math.pow(1 - progress, 3);
-        rotation = startRotation + (targetRotation - startRotation) * easeOut;
+        // Custom easing: slow start, fast middle, very slow end (dramatic!)
+        // Using easeInOut with extra slowdown at the end
+        let ease;
+        if (progress < 0.2) {
+          // Slow start (first 20%)
+          ease = Math.pow(progress / 0.2, 3) * 0.1;
+        } else if (progress < 0.7) {
+          // Fast middle (20% to 70%)
+          const midProgress = (progress - 0.2) / 0.5;
+          ease = 0.1 + midProgress * 0.7;
+        } else {
+          // Very slow end with dramatic deceleration (last 30%)
+          const endProgress = (progress - 0.7) / 0.3;
+          ease = 0.8 + (1 - Math.pow(1 - endProgress, 4)) * 0.2;
+        }
+        
+        const prevRotation = rotation;
+        rotation = startRotation + (targetRotation - startRotation) * ease;
+        
+        // Play click sound when passing a segment boundary
+        if (items.length > 0) {
+          const anglePerItem = (Math.PI * 2) / items.length;
+          const currentSegment = Math.floor(rotation / anglePerItem);
+          if (currentSegment !== lastClickSegment) {
+            playClick();
+            lastClickSegment = currentSegment;
+          }
+        }
         
         drawWheel();
         
@@ -367,21 +534,16 @@
           isSpinning = false;
           document.getElementById('spinBtn').disabled = false;
           
-          // Calculate winner - which segment is under the pointer at top (3*PI/2)
+          // Final dramatic click
+          playClick();
+          
+          // Calculate winner
           const normalizedRotation = (rotation % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
           const anglePerItem = (Math.PI * 2) / items.length;
-          
-          // The pointer is at 3*PI/2 (top)
-          // After rotating by normalizedRotation, find which original segment is now at top
-          // Segment i spans from i*anglePerItem to (i+1)*anglePerItem originally
-          // After rotation, it's at i*anglePerItem + normalizedRotation to (i+1)*anglePerItem + normalizedRotation
-          // We want i where: i*anglePerItem + normalizedRotation <= 3*PI/2 < (i+1)*anglePerItem + normalizedRotation
-          // Solving: i <= (3*PI/2 - normalizedRotation) / anglePerItem < i+1
           
           let relativeAngle = (3 * Math.PI / 2 - normalizedRotation) % (Math.PI * 2);
           if (relativeAngle < 0) relativeAngle += Math.PI * 2;
           
-          // Add small epsilon to handle floating point edge cases
           const winnerIndex = Math.floor((relativeAngle + 0.0001) / anglePerItem) % items.length;
           
           document.getElementById('winner').textContent = items[winnerIndex];
