@@ -137,28 +137,28 @@
     }
     .wheel-wrapper {
       position: relative;
-      width: 300px;
-      height: 300px;
+      width: 350px;
+      height: 350px;
       margin-bottom: 20px;
     }
     body.fullscreen .wheel-wrapper {
-      width: min(70vh, 70vw);
-      height: min(70vh, 70vw);
-      max-width: 600px;
-      max-height: 600px;
+      width: min(75vh, 75vw);
+      height: min(75vh, 75vw);
+      max-width: 700px;
+      max-height: 700px;
     }
     .pointer {
       position: absolute;
-      top: -10px;
+      top: -15px;
       left: 50%;
       transform: translateX(-50%);
       width: 0;
       height: 0;
-      border-left: 12px solid transparent;
-      border-right: 12px solid transparent;
-      border-top: 24px solid #ffd700;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-top: 32px solid #ffd700;
       z-index: 10;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
     }
     canvas {
       width: 100%;
@@ -171,31 +171,52 @@
       gap: 20px;
     }
     .spin-btn {
-      padding: 14px 40px;
-      font-size: 18px;
+      padding: 16px 50px;
+      font-size: 20px;
       background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
       color: #fff;
+      box-shadow: 0 10px 30px rgba(245, 87, 108, 0.4);
+    }
+    .spin-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 40px rgba(245, 87, 108, 0.5);
     }
     .spin-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
     }
     .winner {
       text-align: center;
-      padding: 15px 25px;
+      padding: 20px 40px;
       background: rgba(78, 205, 196, 0.15);
-      border: 1px solid rgba(78, 205, 196, 0.3);
-      border-radius: 12px;
-      font-size: 18px;
-      min-width: 200px;
+      border: 2px solid rgba(78, 205, 196, 0.4);
+      border-radius: 16px;
+      font-size: 24px;
+      min-width: 250px;
+      transition: all 0.3s ease;
+    }
+    .winner.celebrating {
+      animation: winnerPulse 0.5s ease-in-out 3;
+      background: linear-gradient(135deg, rgba(78, 205, 196, 0.3), rgba(245, 87, 108, 0.3));
+      border-color: #4ecdc4;
+      transform: scale(1.05);
+    }
+    @keyframes winnerPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
     }
     .winner span {
       font-weight: 700;
       color: #4ecdc4;
+      font-size: 1.2em;
     }
     body.fullscreen .winner {
-      font-size: 24px;
-      padding: 20px 40px;
+      font-size: 32px;
+      padding: 25px 50px;
+    }
+    body.fullscreen .winner.celebrating {
+      font-size: 40px;
     }
     .fullscreen-btn {
       position: absolute;
@@ -238,9 +259,21 @@
     .sound-toggle input {
       cursor: pointer;
     }
+    /* Confetti canvas */
+    #confetti-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
+  <canvas id="confetti-canvas"></canvas>
+  
   <div class="container">
     <h1>🎯 Wheel Picker</h1>
     <p class="subtitle">Enter your options, spin, and let the wheel decide!</p>
@@ -263,7 +296,7 @@
         
         <label class="sound-toggle">
           <input type="checkbox" id="soundToggle" checked>
-          Enable clicking sound
+          Enable sounds
         </label>
       </div>
       
@@ -271,13 +304,13 @@
         <button class="fullscreen-btn" onclick="toggleFullscreen()">⛶ Full Screen</button>
         <div class="wheel-wrapper">
           <div class="pointer"></div>
-          <canvas id="wheel" width="600" height="600"></canvas>
+          <canvas id="wheel" width="800" height="800"></canvas>
         </div>
         
         <div class="controls">
           <button class="spin-btn" id="spinBtn" onclick="spin()">Spin the Wheel</button>
           
-          <div class="winner">
+          <div class="winner" id="winnerBox">
             Winner: <span id="winner">—</span>
           </div>
         </div>
@@ -298,7 +331,20 @@
     const ctx = canvas.getContext('2d');
     const size = canvas.width;
     const center = size / 2;
-    const radius = center - 10;
+    const radius = center - 20;
+    
+    // Confetti canvas
+    const confettiCanvas = document.getElementById('confetti-canvas');
+    const confettiCtx = confettiCanvas.getContext('2d');
+    let confettiParticles = [];
+    let confettiAnimationId = null;
+    
+    function resizeConfetti() {
+      confettiCanvas.width = window.innerWidth;
+      confettiCanvas.height = window.innerHeight;
+    }
+    resizeConfetti();
+    window.addEventListener('resize', resizeConfetti);
     
     const palette = [
       '#ff6b6b', '#feca57', '#54a0ff', '#5f27cd', '#1dd1a1',
@@ -325,16 +371,124 @@
       const gain = audioContext.createGain();
       
       osc.frequency.setValueAtTime(800, audioContext.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.05);
+      osc.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.03);
       
-      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+      gain.gain.setValueAtTime(0.15, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.03);
       
       osc.connect(gain);
       gain.connect(audioContext.destination);
       
       osc.start(audioContext.currentTime);
-      osc.stop(audioContext.currentTime + 0.05);
+      osc.stop(audioContext.currentTime + 0.03);
+    }
+    
+    // Victory fanfare sound
+    function playFanfare() {
+      if (!document.getElementById('soundToggle').checked) return;
+      if (!audioContext) initAudio();
+      
+      const now = audioContext.currentTime;
+      
+      // First chord (C major)
+      playChord(now, [261.63, 329.63, 392.00], 0.3);
+      // Second chord (F major) 
+      playChord(now + 0.15, [349.23, 440.00, 523.25], 0.3);
+      // Third chord (G major)
+      playChord(now + 0.30, [392.00, 493.88, 587.33], 0.3);
+      // Final chord (C major, sustained)
+      playChord(now + 0.45, [261.63, 329.63, 392.00, 523.25], 0.8);
+    }
+    
+    function playChord(time, frequencies, duration) {
+      frequencies.forEach(freq => {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, time);
+        
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(0.2, time + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
+        
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        
+        osc.start(time);
+        osc.stop(time + duration);
+      });
+    }
+    
+    // Confetti effect
+    function createConfetti() {
+      confettiParticles = [];
+      const colors = ['#ff6b6b', '#feca57', '#54a0ff', '#5f27cd', '#1dd1a1', '#ff9f43', '#48dbfb', '#ff9ff3'];
+      
+      for (let i = 0; i < 150; i++) {
+        confettiParticles.push({
+          x: Math.random() * confettiCanvas.width,
+          y: -20 - Math.random() * 100,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: 8 + Math.random() * 8,
+          speedY: 3 + Math.random() * 4,
+          speedX: (Math.random() - 0.5) * 4,
+          rotation: Math.random() * 360,
+          rotationSpeed: (Math.random() - 0.5) * 10,
+          sway: Math.random() * 0.1,
+          swayOffset: Math.random() * Math.PI * 2
+        });
+      }
+      
+      animateConfetti();
+    }
+    
+    function animateConfetti() {
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      
+      let activeParticles = 0;
+      
+      confettiParticles.forEach(p => {
+        p.y += p.speedY;
+        p.x += p.speedX + Math.sin(p.y * p.sway + p.swayOffset) * 2;
+        p.rotation += p.rotationSpeed;
+        
+        if (p.y < confettiCanvas.height + 20) {
+          activeParticles++;
+          confettiCtx.save();
+          confettiCtx.translate(p.x, p.y);
+          confettiCtx.rotate(p.rotation * Math.PI / 180);
+          confettiCtx.fillStyle = p.color;
+          confettiCtx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+          confettiCtx.restore();
+        }
+      });
+      
+      if (activeParticles > 0) {
+        confettiAnimationId = requestAnimationFrame(animateConfetti);
+      }
+    }
+    
+    function stopConfetti() {
+      if (confettiAnimationId) {
+        cancelAnimationFrame(confettiAnimationId);
+        confettiAnimationId = null;
+      }
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    }
+    
+    function celebrate(winnerName) {
+      // Play fanfare
+      playFanfare();
+      
+      // Animate winner box
+      const winnerBox = document.getElementById('winnerBox');
+      winnerBox.classList.add('celebrating');
+      setTimeout(() => winnerBox.classList.remove('celebrating'), 2000);
+      
+      // Launch confetti
+      createConfetti();
+      setTimeout(stopConfetti, 4000);
     }
     
     function toggleFullscreen() {
@@ -369,6 +523,7 @@
       renderList();
       drawWheel();
       document.getElementById('winner').textContent = '—';
+      stopConfetti();
     }
     
     function shuffleColors() {
@@ -430,6 +585,14 @@
       ctx.rotate(rotation);
       ctx.translate(-center, -center);
       
+      // Dynamic font size based on number of items
+      let fontSize;
+      if (items.length <= 4) fontSize = 28;
+      else if (items.length <= 6) fontSize = 24;
+      else if (items.length <= 10) fontSize = 20;
+      else if (items.length <= 15) fontSize = 16;
+      else fontSize = 14;
+      
       items.forEach((item, i) => {
         const startAngle = i * anglePerItem;
         const endAngle = startAngle + anglePerItem;
@@ -441,12 +604,12 @@
         ctx.fillStyle = colors[i] || '#666';
         ctx.fill();
         ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.stroke();
         
-        // Text
+        // Text - positioned closer to outer edge for better visibility
         const textAngle = startAngle + anglePerItem / 2;
-        const textDist = radius * 0.65;
+        const textDist = radius * 0.75; // Moved further out (was 0.65)
         const textX = center + Math.cos(textAngle) * textDist;
         const textY = center + Math.sin(textAngle) * textDist;
         
@@ -454,10 +617,12 @@
         ctx.translate(textX, textY);
         ctx.rotate(textAngle + Math.PI / 2);
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 16px sans-serif';
+        ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const displayText = item.length > 14 ? item.substring(0, 14) + '...' : item;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 4;
+        const displayText = item.length > 12 ? item.substring(0, 11) + '…' : item;
         ctx.fillText(displayText, 0, 0);
         ctx.restore();
       });
@@ -466,57 +631,52 @@
       
       // Center circle
       ctx.beginPath();
-      ctx.arc(center, center, 25, 0, Math.PI * 2);
+      ctx.arc(center, center, 35, 0, Math.PI * 2);
       ctx.fillStyle = '#1a1a2e';
       ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.3)';
       ctx.lineWidth = 4;
       ctx.stroke();
+      
+      // Center dot
+      ctx.beginPath();
+      ctx.arc(center, center, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#4ecdc4';
+      ctx.fill();
     }
     
     function spin() {
       if (isSpinning || items.length < 2) return;
       
+      // Stop any previous confetti
+      stopConfetti();
+      
       initAudio();
       isSpinning = true;
       document.getElementById('spinBtn').disabled = true;
       document.getElementById('winner').textContent = '—';
+      document.getElementById('winnerBox').classList.remove('celebrating');
       
       const minSpins = 5;
       const maxSpins = 8;
       const totalSpins = minSpins + Math.random() * (maxSpins - minSpins);
       const targetRotation = rotation + totalSpins * Math.PI * 2;
-      const duration = 6000; // 6 seconds for drama
+      const duration = 6000;
       const start = Date.now();
       const startRotation = rotation;
       
-      // Track clicks - one per segment pass
       let lastClickSegment = -1;
       
       function animate() {
         const elapsed = Date.now() - start;
         const progress = Math.min(elapsed / duration, 1);
         
-        // Custom easing: slow start, fast middle, very slow end (dramatic!)
-        // Using easeInOut with extra slowdown at the end
-        let ease;
-        if (progress < 0.2) {
-          // Slow start (first 20%)
-          ease = Math.pow(progress / 0.2, 3) * 0.1;
-        } else if (progress < 0.7) {
-          // Fast middle (20% to 70%)
-          const midProgress = (progress - 0.2) / 0.5;
-          ease = 0.1 + midProgress * 0.7;
-        } else {
-          // Very slow end with dramatic deceleration (last 30%)
-          const endProgress = (progress - 0.7) / 0.3;
-          ease = 0.8 + (1 - Math.pow(1 - endProgress, 4)) * 0.2;
-        }
+        // Smooth deceleration: starts fast, gradually slows down
+        // Cubic ease-out for natural physics feel
+        const ease = 1 - Math.pow(1 - progress, 3);
         
-        const prevRotation = rotation;
         rotation = startRotation + (targetRotation - startRotation) * ease;
         
-        // Play click sound when passing a segment boundary
         if (items.length > 0) {
           const anglePerItem = (Math.PI * 2) / items.length;
           const currentSegment = Math.floor(rotation / anglePerItem);
@@ -534,10 +694,8 @@
           isSpinning = false;
           document.getElementById('spinBtn').disabled = false;
           
-          // Final dramatic click
           playClick();
           
-          // Calculate winner
           const normalizedRotation = (rotation % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
           const anglePerItem = (Math.PI * 2) / items.length;
           
@@ -545,8 +703,12 @@
           if (relativeAngle < 0) relativeAngle += Math.PI * 2;
           
           const winnerIndex = Math.floor((relativeAngle + 0.0001) / anglePerItem) % items.length;
+          const winnerName = items[winnerIndex];
           
-          document.getElementById('winner').textContent = items[winnerIndex];
+          document.getElementById('winner').textContent = winnerName;
+          
+          // Celebrate!
+          celebrate(winnerName);
         }
       }
       
