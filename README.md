@@ -2,6 +2,10 @@
 
 A fun, interactive spinning wheel for randomly selecting from a list of names or items. Perfect for meetings, giveaways, or decisions! Built for screen sharing with dramatic visuals and sound.
 
+## Spin Now
+
+Open [`index.html`](https://milohoffman002.github.io/wheel-picker/) in your browser to start spinning and picking!
+
 ## Features
 
 - **Add items easily** — Paste a list or enter one at a time
