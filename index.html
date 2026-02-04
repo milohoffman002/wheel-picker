@@ -111,6 +111,67 @@
       background: rgba(255,100,100,0.2);
       color: #ff6464;
     }
+    .btn-warning {
+      background: rgba(255,193,7,0.2);
+      color: #ffc107;
+    }
+    /* Mode selector styles */
+    .mode-selector {
+      margin-bottom: 16px;
+      padding: 12px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .mode-label {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .mode-toggle {
+      display: flex;
+      gap: 0;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 4px;
+    }
+    .mode-option {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      background: transparent;
+      color: #888;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .mode-option.active {
+      background: linear-gradient(135deg, #4ecdc4, #44a3aa);
+      color: #fff;
+    }
+    .mode-option:hover:not(.active) {
+      color: #ccc;
+    }
+    .elimination-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: rgba(255,100,100,0.3);
+      color: #ff6464;
+      font-size: 11px;
+      border-radius: 4px;
+      margin-left: 8px;
+      font-weight: 700;
+    }
+    .progress-status {
+      font-size: 13px;
+      color: #4ecdc4;
+      margin-top: 8px;
+      font-weight: 600;
+    }
     .items-list {
       margin-top: 20px;
     }
@@ -129,6 +190,80 @@
       font-size: 12px;
       background: rgba(255,100,100,0.2);
       color: #ff6464;
+    }
+    .eliminated-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .eliminated-section h3 {
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .eliminated-item {
+      background: rgba(255,255,255,0.02);
+      color: #555;
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+    .eliminated-item span::before {
+      content: "✗ ";
+      color: #ff6464;
+      margin-right: 4px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .elimination-controls {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    body.elimination-active .elimination-controls {
+      display: block;
+    }
+    .winner-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      z-index: 2000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.5s ease;
+    }
+    .winner-overlay.show {
+      display: flex;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .winner-overlay h2 {
+      font-size: 48px;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: winnerPulse 1s ease-in-out infinite;
+    }
+    .winner-overlay .final-winner-name {
+      font-size: 64px;
+      font-weight: 700;
+      color: #4ecdc4;
+      margin-bottom: 40px;
+      text-align: center;
+      text-shadow: 0 0 40px rgba(78, 205, 196, 0.5);
+    }
+    .winner-overlay button {
+      padding: 16px 40px;
+      font-size: 18px;
     }
     .wheel-container {
       display: flex;
@@ -269,6 +404,15 @@
       pointer-events: none;
       z-index: 1000;
     }
+    .min-items-warning {
+      color: #ff6464;
+      font-size: 13px;
+      margin-top: 8px;
+      display: none;
+    }
+    .min-items-warning.show {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -280,6 +424,16 @@
     
     <div class="layout">
       <div class="panel">
+        <!-- Mode Selector -->
+        <div class="mode-selector">
+          <div class="mode-label">Game Mode</div>
+          <div class="mode-toggle">
+            <button class="mode-option active" id="modeNormal" onclick="setMode('normal')">Normal</button>
+            <button class="mode-option" id="modeElimination" onclick="setMode('elimination')">Elimination</button>
+          </div>
+          <div class="progress-status" id="progressStatus"></div>
+        </div>
+
         <label for="itemInput">Items (one per line)</label>
         <textarea id="itemInput" placeholder="Pizza&#10;Sushi&#10;Tacos&#10;Burgers"></textarea>
         
@@ -289,9 +443,26 @@
           <button class="btn-danger" onclick="clearAll()">Clear</button>
         </div>
         
+        <div class="min-items-warning" id="minItemsWarning">
+          ⚠️ Need at least 2 items to spin
+        </div>
+
+        <!-- Elimination Controls -->
+        <div class="elimination-controls" id="eliminationControls">
+          <div class="btn-row">
+            <button class="btn-warning" onclick="resetElimination()">🔄 Reset Elimination</button>
+          </div>
+        </div>
+        
         <div class="items-list">
-          <h3>Items on Wheel</h3>
+          <h3>Items on Wheel <span id="activeCount"></span></h3>
           <div id="itemsList"></div>
+        </div>
+
+        <!-- Eliminated Items Section -->
+        <div class="eliminated-section" id="eliminatedSection" style="display: none;">
+          <h3>Eliminated <span id="eliminatedCount"></span></h3>
+          <div id="eliminatedList"></div>
         </div>
         
         <label class="sound-toggle">
@@ -311,7 +482,7 @@
           <button class="spin-btn" id="spinBtn" onclick="spin()">Spin the Wheel</button>
           
           <div class="winner" id="winnerBox">
-            Winner: <span id="winner">—</span>
+            <span id="winnerLabel">Winner:</span> <span id="winner">—</span>
           </div>
         </div>
       </div>
@@ -320,12 +491,27 @@
   
   <button class="exit-fullscreen" onclick="toggleFullscreen()">✕ Exit Full Screen</button>
 
+  <!-- Winner Overlay for Elimination Mode -->
+  <div class="winner-overlay" id="winnerOverlay">
+    <h2>🏆 Winner! 🏆</h2>
+    <div class="final-winner-name" id="finalWinnerName"></div>
+    <button class="btn-primary" onclick="closeWinnerOverlay()">Awesome!</button>
+  </div>
+
   <script>
+    // Game state
     let items = [];
     let colors = [];
     let rotation = 0;
     let isSpinning = false;
     let audioContext = null;
+    
+    // Elimination mode state
+    let gameMode = 'normal'; // 'normal' or 'elimination'
+    let eliminatedItems = [];
+    let originalItems = []; // Store original items for reset
+    let eliminationRound = 0;
+    let finalWinner = null;
     
     const canvas = document.getElementById('wheel');
     const ctx = canvas.getContext('2d');
@@ -477,7 +663,7 @@
       confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
     }
     
-    function celebrate(winnerName) {
+    function celebrate(winnerName, isFinal = false) {
       // Play fanfare
       playFanfare();
       
@@ -488,12 +674,129 @@
       
       // Launch confetti
       createConfetti();
-      setTimeout(stopConfetti, 4000);
+      setTimeout(stopConfetti, isFinal ? 6000 : 4000);
     }
     
     function toggleFullscreen() {
       document.body.classList.toggle('fullscreen');
       drawWheel();
+    }
+    
+    // Mode switching
+    function setMode(mode) {
+      gameMode = mode;
+      
+      // Update UI
+      document.getElementById('modeNormal').classList.toggle('active', mode === 'normal');
+      document.getElementById('modeElimination').classList.toggle('active', mode === 'elimination');
+      
+      // Update body class for CSS
+      if (mode === 'elimination') {
+        document.body.classList.add('elimination-active');
+      } else {
+        document.body.classList.remove('elimination-active');
+      }
+      
+      // Reset elimination state when switching to normal
+      if (mode === 'normal') {
+        eliminatedItems = [];
+        eliminationRound = 0;
+        finalWinner = null;
+        // Restore original items if we have them
+        if (originalItems.length > 0) {
+          items = [...originalItems];
+          originalItems = [];
+          generateColors();
+        }
+      } else {
+        // Starting elimination mode - save original items
+        if (items.length > 0 && originalItems.length === 0) {
+          originalItems = [...items];
+        }
+        eliminationRound = 0;
+        eliminatedItems = [];
+        finalWinner = null;
+      }
+      
+      updateProgressStatus();
+      renderList();
+      renderEliminatedList();
+      drawWheel();
+      updateWinnerDisplay();
+    }
+    
+    function updateProgressStatus() {
+      const statusEl = document.getElementById('progressStatus');
+      const warningEl = document.getElementById('minItemsWarning');
+      
+      if (gameMode === 'elimination') {
+        if (items.length < 2) {
+          statusEl.textContent = '';
+          warningEl.classList.add('show');
+        } else {
+          warningEl.classList.remove('show');
+          const totalItems = items.length + eliminatedItems.length;
+          const round = eliminatedItems.length + 1;
+          statusEl.textContent = `Round ${round} of ${totalItems - 1} • ${items.length} remaining`;
+        }
+      } else {
+        statusEl.textContent = '';
+        if (items.length < 2) {
+          warningEl.classList.add('show');
+        } else {
+          warningEl.classList.remove('show');
+        }
+      }
+    }
+    
+    function updateWinnerDisplay() {
+      const winnerLabel = document.getElementById('winnerLabel');
+      const winnerSpan = document.getElementById('winner');
+      
+      if (gameMode === 'elimination' && finalWinner) {
+        winnerLabel.textContent = 'Winner:';
+        winnerSpan.textContent = finalWinner;
+      } else if (gameMode === 'elimination' && items.length === 1 && !finalWinner) {
+        // Auto-declare last remaining item as winner
+        finalWinner = items[0];
+        winnerLabel.textContent = 'Winner:';
+        winnerSpan.textContent = finalWinner;
+        celebrate(finalWinner, true);
+        showWinnerOverlay(finalWinner);
+      } else {
+        winnerLabel.textContent = 'Winner:';
+        if (!winnerSpan.textContent || winnerSpan.textContent === '—') {
+          winnerSpan.textContent = '—';
+        }
+      }
+    }
+    
+    function showWinnerOverlay(winnerName) {
+      document.getElementById('finalWinnerName').textContent = winnerName;
+      document.getElementById('winnerOverlay').classList.add('show');
+    }
+    
+    function closeWinnerOverlay() {
+      document.getElementById('winnerOverlay').classList.remove('show');
+    }
+    
+    function resetElimination() {
+      if (originalItems.length > 0) {
+        items = [...originalItems];
+        eliminatedItems = [];
+        eliminationRound = 0;
+        finalWinner = null;
+        generateColors();
+        renderList();
+        renderEliminatedList();
+        drawWheel();
+        updateProgressStatus();
+        
+        // Reset winner display
+        document.getElementById('winner').textContent = '—';
+        document.getElementById('winnerBox').classList.remove('celebrating');
+        stopConfetti();
+      }
     }
     
     function addItems() {
@@ -503,27 +806,51 @@
       if (lines.length === 0) return;
       
       items = [...items, ...lines];
+      
+      // In elimination mode, update original items too
+      if (gameMode === 'elimination') {
+        originalItems = [...items];
+        eliminationRound = 0;
+        eliminatedItems = [];
+        finalWinner = null;
+      }
+      
       input.value = '';
       generateColors();
       renderList();
+      renderEliminatedList();
       drawWheel();
+      updateProgressStatus();
     }
     
     function removeItem(index) {
       items.splice(index, 1);
+      
+      // Update original items in elimination mode
+      if (gameMode === 'elimination') {
+        originalItems = [...items, ...eliminatedItems];
+      }
+      
       generateColors();
       renderList();
       drawWheel();
+      updateProgressStatus();
     }
     
     function clearAll() {
       items = [];
       colors = [];
       rotation = 0;
+      eliminatedItems = [];
+      originalItems = [];
+      eliminationRound = 0;
+      finalWinner = null;
       renderList();
+      renderEliminatedList();
       drawWheel();
       document.getElementById('winner').textContent = '—';
       stopConfetti();
+      updateProgressStatus();
     }
     
     function shuffleColors() {
@@ -545,15 +872,42 @@
     
     function renderList() {
       const list = document.getElementById('itemsList');
+      const countEl = document.getElementById('activeCount');
+      
       if (items.length === 0) {
         list.innerHTML = '<div style="color: #666;">No items yet</div>';
+        countEl.textContent = '';
         return;
       }
+      
+      countEl.textContent = `(${items.length})`;
       
       list.innerHTML = items.map((item, i) => `
         <div class="item">
           <span>${escapeHtml(item)}</span>
           <button onclick="removeItem(${i})">Remove</button>
+        </div>
+      `).join('');
+    }
+    
+    function renderEliminatedList() {
+      const section = document.getElementById('eliminatedSection');
+      const list = document.getElementById('eliminatedList');
+      const countEl = document.getElementById('eliminatedCount');
+      
+      if (gameMode !== 'elimination' || eliminatedItems.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+      
+      section.style.display = 'block';
+      countEl.textContent = `(${eliminatedItems.length})`;
+      
+      // Show in reverse order (most recently eliminated first)
+      const reversed = [...eliminatedItems].reverse();
+      list.innerHTML = reversed.map((item) => `
+        <div class="item eliminated-item">
+          <span>${escapeHtml(item)}</span>
         </div>
       `).join('');
     }
@@ -609,7 +963,7 @@
         
         // Text - positioned closer to outer edge for better visibility
         const textAngle = startAngle + anglePerItem / 2;
-        const textDist = radius * 0.75; // Moved further out (was 0.65)
+        const textDist = radius * 0.75;
         const textX = center + Math.cos(textAngle) * textDist;
         const textY = center + Math.sin(textAngle) * textDist;
         
@@ -672,7 +1026,6 @@
         const progress = Math.min(elapsed / duration, 1);
         
         // Smooth deceleration: starts fast, gradually slows down
-        // Cubic ease-out for natural physics feel
         const ease = 1 - Math.pow(1 - progress, 3);
         
         rotation = startRotation + (targetRotation - startRotation) * ease;
@@ -705,19 +1058,76 @@
           const winnerIndex = Math.floor((relativeAngle + 0.0001) / anglePerItem) % items.length;
           const winnerName = items[winnerIndex];
           
-          document.getElementById('winner').textContent = winnerName;
-          
-          // Celebrate!
-          celebrate(winnerName);
+          // Handle based on game mode
+          if (gameMode === 'elimination') {
+            handleEliminationSpin(winnerIndex, winnerName);
+          } else {
+            // Normal mode - just show winner
+            document.getElementById('winner').textContent = winnerName;
+            celebrate(winnerName);
+          }
         }
       }
       
       requestAnimationFrame(animate);
     }
     
+    function handleEliminationSpin(winnerIndex, winnerName) {
+      if (items.length === 2) {
+        // Final round: picked item is eliminated, remaining is winner
+        const eliminatedName = items[winnerIndex];
+        eliminatedItems.push(eliminatedName);
+        
+        // Remove from items
+        items.splice(winnerIndex, 1);
+        
+        // The remaining item is the winner
+        finalWinner = items[0];
+        
+        generateColors();
+        renderList();
+        renderEliminatedList();
+        drawWheel();
+        updateProgressStatus();
+        
+        // Show final winner
+        document.getElementById('winner').textContent = finalWinner;
+        celebrate(finalWinner, true);
+        showWinnerOverlay(finalWinner);
+      } else {
+        // Normal elimination round
+        eliminatedItems.push(winnerName);
+        items.splice(winnerIndex, 1);
+        eliminationRound++;
+        
+        generateColors();
+        renderList();
+        renderEliminatedList();
+        drawWheel();
+        updateProgressStatus();
+        
+        // Show eliminated item
+        document.getElementById('winner').textContent = `${winnerName} eliminated!`;
+        
+        // Small celebration for elimination (shorter)
+        celebrate(winnerName, false);
+        
+        // Check if we somehow got to 1 item (edge case)
+        if (items.length === 1) {
+          finalWinner = items[0];
+          setTimeout(() => {
+            document.getElementById('winner').textContent = finalWinner;
+            celebrate(finalWinner, true);
+            showWinnerOverlay(finalWinner);
+          }, 1500);
+        }
+      }
+    }
+    
     // Initialize
     renderList();
     drawWheel();
+    updateProgressStatus();
   </script>
 </body>
 </html>

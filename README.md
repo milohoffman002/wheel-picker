@@ -15,15 +15,32 @@ A fun, interactive spinning wheel for randomly selecting from a list of names or
 - **Manage items** — Remove individual items or clear all
 - **Shuffle colors** — Randomize segment colors anytime
 - **Dark theme** — Easy on the eyes
+- **🆕 Tournament Mode (Elimination)** — Spin to eliminate items one by one until a final winner remains
 
 ## How to Use
 
+### Normal Mode (Random Winner)
 1. Open `index.html` in any modern browser
 2. Enter names/items in the text area (one per line)
 3. Click **Add to Wheel**
 4. (Optional) Click **⛶ Full Screen** for screen sharing mode
 5. Click **Spin the Wheel** and enjoy the show!
 6. The winner is celebrated with music, confetti, and animation
+
+### Tournament Mode (Elimination)
+1. Switch to **Elimination** mode using the game mode toggle
+2. Click **Start Elimination Round** to lock in your items
+3. Click **Spin the Wheel** — the picked item is eliminated (removed from wheel)
+4. Continue spinning until only 2 items remain
+5. The final spin eliminates one item — the remaining item is the **WINNER**!
+6. Watch the special winner overlay celebration
+7. Click **🔄 Reset Elimination** to start a new round with the same items
+
+**Tournament Mode Features:**
+- Track eliminated items in a greyed-out "Eliminated" section
+- See round progress (e.g., "Round 3 of 5")
+- Strikethrough styling on eliminated items
+- Dramatic winner reveal when tournament completes
 
 ## Use Cases
 
@@ -33,6 +50,9 @@ A fun, interactive spinning wheel for randomly selecting from a list of names or
 - Team assignments
 - Party games
 - Live streaming / content creation
+- **Tournament brackets** — Elimination mode for running brackets round by round
+- **March Madness style** — Narrow down options until a champion emerges
+- **Team drafts** — Elimination format for fair pick ordering
 
 ## Tech Stack
 
@@ -47,6 +67,3 @@ A fun, interactive spinning wheel for randomly selecting from a list of names or
 - Click **⛶ Full Screen** button to enter presentation mode
 - Click **✕ Exit Full Screen** or press Escape to return to normal view
 
-## License
-
-MIT License
