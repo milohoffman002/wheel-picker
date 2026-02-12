@@ -220,6 +220,34 @@
       padding-top: 12px;
       border-top: 1px solid rgba(255,255,255,0.1);
     }
+    .elimination-message-field {
+      margin-bottom: 12px;
+    }
+    .elimination-message-field label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    .elimination-message-field input {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .elimination-message-field input:focus {
+      outline: none;
+      border-color: #4ecdc4;
+    }
+    .field-hint {
+      display: block;
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+    }
     body.elimination-active .elimination-controls {
       display: block;
     }
@@ -449,6 +477,11 @@
 
         <!-- Elimination Controls -->
         <div class="elimination-controls" id="eliminationControls">
+          <div class="elimination-message-field">
+            <label for="eliminationMessage">Elimination Message</label>
+            <input type="text" id="eliminationMessage" value="eliminated" placeholder="e.g., up next, selected, etc.">
+            <small class="field-hint">Shown as: Winner: [item] [message]</small>
+          </div>
           <div class="btn-row">
             <button class="btn-warning" onclick="resetElimination()">🔄 Reset Elimination</button>
           </div>
@@ -510,6 +543,7 @@
     let gameMode = 'normal'; // 'normal' or 'elimination'
     let eliminatedItems = [];
     let originalItems = []; // Store original items for reset
+    let originalColors = []; // Store original colors for consistency
     let eliminationRound = 0;
     let finalWinner = null;
     
@@ -702,16 +736,21 @@
         eliminatedItems = [];
         eliminationRound = 0;
         finalWinner = null;
-        // Restore original items if we have them
+        // Restore original items and colors if we have them
         if (originalItems.length > 0) {
           items = [...originalItems];
           originalItems = [];
+          originalColors = [];
           generateColors();
         }
       } else {
-        // Starting elimination mode - save original items
+        // Starting elimination mode - save original items and colors
         if (items.length > 0 && originalItems.length === 0) {
           originalItems = [...items];
+          // Generate colors if needed and store them
+          if (originalColors.length === 0) {
+            generateColors();
+          }
         }
         eliminationRound = 0;
         eliminatedItems = [];
@@ -786,7 +825,8 @@
         eliminatedItems = [];
         eliminationRound = 0;
         finalWinner = null;
-        generateColors();
+        // Restore original colors
+        colors = [...originalColors];
         renderList();
         renderEliminatedList();
         drawWheel();
@@ -807,12 +847,13 @@
       
       items = [...items, ...lines];
       
-      // In elimination mode, update original items too
+      // In elimination mode, update original items and regenerate colors
       if (gameMode === 'elimination') {
         originalItems = [...items];
         eliminationRound = 0;
         eliminatedItems = [];
         finalWinner = null;
+        originalColors = []; // Clear original colors so new ones are generated
       }
       
       input.value = '';
@@ -824,14 +865,20 @@
     }
     
     function removeItem(index) {
+      const removedItem = items[index];
       items.splice(index, 1);
+      colors.splice(index, 1);
       
       // Update original items in elimination mode
       if (gameMode === 'elimination') {
-        originalItems = [...items, ...eliminatedItems];
+        // Remove from originalItems and originalColors as well
+        const originalIndex = originalItems.indexOf(removedItem);
+        if (originalIndex > -1) {
+          originalItems.splice(originalIndex, 1);
+          originalColors.splice(originalIndex, 1);
+        }
       }
       
-      generateColors();
       renderList();
       drawWheel();
       updateProgressStatus();
@@ -843,6 +890,7 @@
       rotation = 0;
       eliminatedItems = [];
       originalItems = [];
+      originalColors = [];
       eliminationRound = 0;
       finalWinner = null;
       renderList();
@@ -859,14 +907,27 @@
     }
     
     function generateColors() {
-      colors = [];
-      for (let i = 0; i < items.length; i++) {
-        colors.push(palette[i % palette.length]);
-      }
-      // Shuffle
-      for (let i = colors.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [colors[i], colors[j]] = [colors[j], colors[i]];
+      // Only generate new colors if we don't have original colors stored
+      // or if we're in normal mode and adding new items
+      if (gameMode === 'normal' || originalColors.length === 0) {
+        colors = [];
+        for (let i = 0; i < items.length; i++) {
+          colors.push(palette[i % palette.length]);
+        }
+        // Shuffle
+        for (let i = colors.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [colors[i], colors[j]] = [colors[j], colors[i]];
+        }
+        // Store as original colors for elimination mode
+        originalColors = [...colors];
+      } else {
+        // In elimination mode with existing original colors,
+        // filter colors to match remaining items
+        colors = items.map(item => {
+          const originalIndex = originalItems.indexOf(item);
+          return originalColors[originalIndex];
+        });
       }
     }
     
@@ -1078,13 +1139,13 @@
         const eliminatedName = items[winnerIndex];
         eliminatedItems.push(eliminatedName);
         
-        // Remove from items
+        // Remove from items and colors
         items.splice(winnerIndex, 1);
+        colors.splice(winnerIndex, 1);
         
         // The remaining item is the winner
         finalWinner = items[0];
         
-        generateColors();
         renderList();
         renderEliminatedList();
         drawWheel();
@@ -1098,16 +1159,17 @@
         // Normal elimination round
         eliminatedItems.push(winnerName);
         items.splice(winnerIndex, 1);
+        colors.splice(winnerIndex, 1);
         eliminationRound++;
         
-        generateColors();
         renderList();
         renderEliminatedList();
         drawWheel();
         updateProgressStatus();
         
-        // Show eliminated item
-        document.getElementById('winner').textContent = `${winnerName} eliminated!`;
+        // Show eliminated item with custom message
+        const eliminationMsg = document.getElementById('eliminationMessage').value.trim() || 'eliminated';
+        document.getElementById('winner').textContent = `${winnerName} ${eliminationMsg}!`;
         
         // Small celebration for elimination (shorter)
         celebrate(winnerName, false);
@@ -1115,6 +1177,8 @@
         // Check if we somehow got to 1 item (edge case)
         if (items.length === 1) {
           finalWinner = items[0];
+          // Keep the single remaining color
+          colors = [colors[0]];
           setTimeout(() => {
             document.getElementById('winner').textContent = finalWinner;
             celebrate(finalWinner, true);
