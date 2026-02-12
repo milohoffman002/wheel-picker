@@ -285,9 +285,18 @@
       font-size: 64px;
       font-weight: 700;
       color: #4ecdc4;
-      margin-bottom: 40px;
+      margin-bottom: 20px;
       text-align: center;
       text-shadow: 0 0 40px rgba(78, 205, 196, 0.5);
+    }
+    .winner-overlay .runner-up {
+      font-size: 24px;
+      color: #888;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+    .winner-overlay .runner-up span {
+      color: #ff6464;
     }
     .winner-overlay button {
       padding: 16px 40px;
@@ -528,6 +537,7 @@
   <div class="winner-overlay" id="winnerOverlay">
     <h2>🏆 Winner! 🏆</h2>
     <div class="final-winner-name" id="finalWinnerName"></div>
+    <div class="runner-up" id="runnerUp"></div>
     <button class="btn-primary" onclick="closeWinnerOverlay()">Awesome!</button>
   </div>
 
@@ -546,6 +556,7 @@
     let originalColors = []; // Store original colors for consistency
     let eliminationRound = 0;
     let finalWinner = null;
+    let lastEliminated = null; // Track the most recently eliminated item for runner-up display
     
     const canvas = document.getElementById('wheel');
     const ctx = canvas.getContext('2d');
@@ -736,6 +747,7 @@
         eliminatedItems = [];
         eliminationRound = 0;
         finalWinner = null;
+        lastEliminated = null; // Reset runner-up tracking
         // Restore original items and colors if we have them
         if (originalItems.length > 0) {
           items = [...originalItems];
@@ -755,6 +767,7 @@
         eliminationRound = 0;
         eliminatedItems = [];
         finalWinner = null;
+        lastEliminated = null; // Reset runner-up tracking
       }
       
       updateProgressStatus();
@@ -767,13 +780,19 @@
     function updateProgressStatus() {
       const statusEl = document.getElementById('progressStatus');
       const warningEl = document.getElementById('minItemsWarning');
+      const spinBtn = document.getElementById('spinBtn');
       
       if (gameMode === 'elimination') {
         if (items.length < 2) {
           statusEl.textContent = '';
           warningEl.classList.add('show');
+          // Disable spin button when only 1 item left in elimination mode
+          if (items.length === 1) {
+            spinBtn.disabled = true;
+          }
         } else {
           warningEl.classList.remove('show');
+          spinBtn.disabled = false;
           const totalItems = items.length + eliminatedItems.length;
           const round = eliminatedItems.length + 1;
           statusEl.textContent = `Round ${round} of ${totalItems - 1} • ${items.length} remaining`;
@@ -785,6 +804,8 @@
         } else {
           warningEl.classList.remove('show');
         }
+        // Re-enable spin button in normal mode when we have enough items
+        spinBtn.disabled = items.length < 2;
       }
     }
     
@@ -812,6 +833,17 @@
     
     function showWinnerOverlay(winnerName) {
       document.getElementById('finalWinnerName').textContent = winnerName;
+      
+      // Show runner-up if available
+      const runnerUpEl = document.getElementById('runnerUp');
+      if (lastEliminated) {
+        const eliminationMsg = document.getElementById('eliminationMessage').value.trim() || 'eliminated';
+        runnerUpEl.innerHTML = `Runner up: <span>${escapeHtml(lastEliminated)}</span> ${escapeHtml(eliminationMsg)}`;
+        runnerUpEl.style.display = 'block';
+      } else {
+        runnerUpEl.style.display = 'none';
+      }
+      
       document.getElementById('winnerOverlay').classList.add('show');
     }
     
@@ -825,8 +857,10 @@
         eliminatedItems = [];
         eliminationRound = 0;
         finalWinner = null;
-        // Restore original colors
-        colors = [...originalColors];
+        lastEliminated = null; // Reset runner-up tracking
+        // Regenerate colors to ensure they match items
+        originalColors = [];
+        generateColors();
         renderList();
         renderEliminatedList();
         drawWheel();
@@ -893,6 +927,7 @@
       originalColors = [];
       eliminationRound = 0;
       finalWinner = null;
+      lastEliminated = null; // Reset runner-up tracking
       renderList();
       renderEliminatedList();
       drawWheel();
@@ -902,6 +937,10 @@
     }
     
     function shuffleColors() {
+      // In elimination mode, clear original colors to force new shuffle
+      if (gameMode === 'elimination') {
+        originalColors = [];
+      }
       generateColors();
       drawWheel();
     }
@@ -911,13 +950,16 @@
       // or if we're in normal mode and adding new items
       if (gameMode === 'normal' || originalColors.length === 0) {
         colors = [];
-        for (let i = 0; i < items.length; i++) {
-          colors.push(palette[i % palette.length]);
-        }
-        // Shuffle
-        for (let i = colors.length - 1; i > 0; i--) {
+        // Pick random colors from the full palette, not just sequential ones
+        const shuffledPalette = [...palette];
+        // Shuffle the palette first
+        for (let i = shuffledPalette.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [colors[i], colors[j]] = [colors[j], colors[i]];
+          [shuffledPalette[i], shuffledPalette[j]] = [shuffledPalette[j], shuffledPalette[i]];
+        }
+        // Take colors from the shuffled palette
+        for (let i = 0; i < items.length; i++) {
+          colors.push(shuffledPalette[i % shuffledPalette.length]);
         }
         // Store as original colors for elimination mode
         originalColors = [...colors];
@@ -1137,6 +1179,7 @@
       if (items.length === 2) {
         // Final round: picked item is eliminated, remaining is winner
         const eliminatedName = items[winnerIndex];
+        lastEliminated = eliminatedName; // Track for runner-up display
         eliminatedItems.push(eliminatedName);
         
         // Remove from items and colors
@@ -1157,6 +1200,7 @@
         showWinnerOverlay(finalWinner);
       } else {
         // Normal elimination round
+        lastEliminated = winnerName; // Track for runner-up display
         eliminatedItems.push(winnerName);
         items.splice(winnerIndex, 1);
         colors.splice(winnerIndex, 1);
