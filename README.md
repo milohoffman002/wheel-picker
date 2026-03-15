@@ -46,6 +46,12 @@ Open [`index.html`](https://milohoffman002.github.io/wheel-picker/) in your brow
 - Strikethrough styling on eliminated items
 - Dramatic winner reveal when tournament completes
 
+**Elimination Mode Configuration:**
+
+- **Opening String** — Optional text shown in the winner display at the start of each spin (e.g. *"Spinning for…"*). Leave blank to show nothing until a result comes in.
+- **Elimination Message** — Appended to the winner display after each elimination (e.g. *"Pizza eliminated!"*). Defaults to `eliminated`.
+- **Slice Animation** — When enabled, the selected slice expands with a gold glow and pulses for 1.5 seconds before flying off the wheel, making it easy to see which item was picked. Disable for instant eliminations. Only visible when Elimination mode is active.
+
 ## Use Cases
 
 - Meeting facilitation (who goes first?)
