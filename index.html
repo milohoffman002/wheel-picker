@@ -431,6 +431,12 @@
     .sound-toggle input {
       cursor: pointer;
     }
+    .slice-animation-toggle {
+      display: none;
+    }
+    body.elimination-active .slice-animation-toggle {
+      display: flex;
+    }
     /* Confetti canvas */
     #confetti-canvas {
       position: fixed;
@@ -487,6 +493,11 @@
         <!-- Elimination Controls -->
         <div class="elimination-controls" id="eliminationControls">
           <div class="elimination-message-field">
+            <label for="openingString">Opening String</label>
+            <input type="text" id="openingString" placeholder="e.g., Spinning for…">
+            <small class="field-hint">Shown when a round starts (leave blank to show nothing)</small>
+          </div>
+          <div class="elimination-message-field">
             <label for="eliminationMessage">Elimination Message</label>
             <input type="text" id="eliminationMessage" value="eliminated" placeholder="e.g., up next, selected, etc.">
             <small class="field-hint">Shown as: Winner: [item] [message]</small>
@@ -511,13 +522,17 @@
           <input type="checkbox" id="soundToggle" checked>
           Enable sounds
         </label>
+        <label class="sound-toggle slice-animation-toggle" id="sliceAnimationLabel">
+          <input type="checkbox" id="sliceAnimationToggle" checked>
+          Slice animation
+        </label>
       </div>
       
       <div class="panel wheel-container">
         <button class="fullscreen-btn" onclick="toggleFullscreen()">⛶ Full Screen</button>
         <div class="wheel-wrapper">
           <div class="pointer"></div>
-          <canvas id="wheel" width="800" height="800"></canvas>
+          <canvas id="wheel" width="900" height="900"></canvas>
         </div>
         
         <div class="controls">
@@ -557,12 +572,21 @@
     let eliminationRound = 0;
     let finalWinner = null;
     let lastEliminated = null; // Track the most recently eliminated item for runner-up display
+
+    // Preload ta-da sound (CC0 brass fanfare from freesound.org/people/plasterbrain/sounds/397353/)
+    const taDaAudio = new Audio('https://cdn.freesound.org/previews/397/397353_4284968-lq.mp3');
+    taDaAudio.preload = 'auto';
+
+    // Elimination reveal animation state
+    let revealState = null; // null or { itemIndex, winnerIndex, winnerName, isFinal, startTime }
+    const REVEAL_HOLD_MS = 1500; // how long the highlighted slice stays on screen
+    const REVEAL_FALL_MS = 700;  // duration of the fall-off animation
     
     const canvas = document.getElementById('wheel');
     const ctx = canvas.getContext('2d');
     const size = canvas.width;
     const center = size / 2;
-    const radius = center - 20;
+    const radius = center - 70;
     
     // Confetti canvas
     const confettiCanvas = document.getElementById('confetti-canvas');
@@ -650,7 +674,22 @@
         osc.stop(time + duration);
       });
     }
-    
+
+    // Ta-da! sound for slice reveal
+    // Uses a real brass fanfare MP3 (CC0) with a synth fallback if offline
+    function playTaDa() {
+      if (!document.getElementById('soundToggle').checked) return;
+
+      taDaAudio.currentTime = 0;
+      taDaAudio.play().catch(() => {
+        // Fallback to synth if the file can't be fetched
+        if (!audioContext) initAudio();
+        const now = audioContext.currentTime;
+        playChord(now, [196.00, 261.63], 0.2);
+        playChord(now + 0.24, [261.63, 329.63, 392.00], 0.75);
+      });
+    }
+
     // Confetti effect
     function createConfetti() {
       confettiParticles = [];
@@ -812,7 +851,10 @@
     function updateWinnerDisplay() {
       const winnerLabel = document.getElementById('winnerLabel');
       const winnerSpan = document.getElementById('winner');
-      
+      const winnerBox = document.getElementById('winnerBox');
+
+      winnerBox.style.display = '';
+
       if (gameMode === 'elimination' && finalWinner) {
         winnerLabel.textContent = 'Winner:';
         winnerSpan.textContent = finalWinner;
@@ -823,6 +865,15 @@
         winnerSpan.textContent = finalWinner;
         celebrate(finalWinner, true);
         showWinnerOverlay(finalWinner);
+      } else if (gameMode === 'elimination') {
+        // Idle in elimination mode — show opening string or hide box
+        const openingStr = document.getElementById('openingString').value.trim();
+        if (openingStr) {
+          winnerLabel.textContent = '';
+          winnerSpan.textContent = openingStr;
+        } else {
+          winnerBox.style.display = 'none';
+        }
       } else {
         winnerLabel.textContent = 'Winner:';
         if (!winnerSpan.textContent || winnerSpan.textContent === '—') {
@@ -867,9 +918,9 @@
         updateProgressStatus();
         
         // Reset winner display
-        document.getElementById('winner').textContent = '—';
         document.getElementById('winnerBox').classList.remove('celebrating');
         stopConfetti();
+        updateWinnerDisplay();
       }
     }
     
@@ -931,7 +982,9 @@
       renderList();
       renderEliminatedList();
       drawWheel();
+      document.getElementById('winnerLabel').textContent = 'Winner:';
       document.getElementById('winner').textContent = '—';
+      document.getElementById('winnerBox').style.display = '';
       stopConfetti();
       updateProgressStatus();
     }
@@ -1022,6 +1075,8 @@
     }
     
     function drawWheel() {
+      // Don't overwrite an active reveal animation
+      if (revealState) return;
       ctx.clearRect(0, 0, size, size);
       
       if (items.length === 0) {
@@ -1111,8 +1166,22 @@
       initAudio();
       isSpinning = true;
       document.getElementById('spinBtn').disabled = true;
-      document.getElementById('winner').textContent = '—';
       document.getElementById('winnerBox').classList.remove('celebrating');
+
+      if (gameMode === 'elimination') {
+        const openingStr = document.getElementById('openingString').value.trim();
+        if (openingStr) {
+          document.getElementById('winnerLabel').textContent = '';
+          document.getElementById('winner').textContent = openingStr;
+          document.getElementById('winnerBox').style.display = '';
+        } else {
+          document.getElementById('winnerBox').style.display = 'none';
+        }
+      } else {
+        document.getElementById('winnerLabel').textContent = 'Winner:';
+        document.getElementById('winner').textContent = '—';
+        document.getElementById('winnerBox').style.display = '';
+      }
       
       const minSpins = 5;
       const maxSpins = 8;
@@ -1148,23 +1217,23 @@
           requestAnimationFrame(animate);
         } else {
           isSpinning = false;
-          document.getElementById('spinBtn').disabled = false;
-          
           playClick();
-          
+
           const normalizedRotation = (rotation % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
           const anglePerItem = (Math.PI * 2) / items.length;
-          
+
           let relativeAngle = (3 * Math.PI / 2 - normalizedRotation) % (Math.PI * 2);
           if (relativeAngle < 0) relativeAngle += Math.PI * 2;
-          
+
           const winnerIndex = Math.floor((relativeAngle + 0.0001) / anglePerItem) % items.length;
           const winnerName = items[winnerIndex];
-          
+
           // Handle based on game mode
           if (gameMode === 'elimination') {
+            // Spin button stays disabled until the reveal animation completes
             handleEliminationSpin(winnerIndex, winnerName);
           } else {
+            document.getElementById('spinBtn').disabled = false;
             // Normal mode - just show winner
             document.getElementById('winner').textContent = winnerName;
             celebrate(winnerName);
@@ -1176,52 +1245,242 @@
     }
     
     function handleEliminationSpin(winnerIndex, winnerName) {
-      if (items.length === 2) {
-        // Final round: picked item is eliminated, remaining is winner
-        const eliminatedName = items[winnerIndex];
-        lastEliminated = eliminatedName; // Track for runner-up display
-        eliminatedItems.push(eliminatedName);
-        
-        // Remove from items and colors
+      const isFinal = (items.length === 2);
+      const eliminationMsg = document.getElementById('eliminationMessage').value.trim() || 'eliminated';
+
+      // Restore winner box and show what was picked
+      document.getElementById('winnerLabel').textContent = 'Winner:';
+      document.getElementById('winnerBox').style.display = '';
+      document.getElementById('winner').textContent = `${winnerName} ${eliminationMsg}!`;
+
+      if (document.getElementById('sliceAnimationToggle').checked) {
+        // Play ta-da and start the reveal animation (slice stays highlighted, then falls off)
+        playTaDa();
+        revealState = {
+          itemIndex: winnerIndex,
+          winnerIndex: winnerIndex,
+          winnerName: winnerName,
+          isFinal: isFinal,
+          startTime: Date.now()
+        };
+        animateReveal();
+      } else {
+        // Skip animation — eliminate immediately
+        completeElimination(winnerIndex, winnerName, isFinal);
+      }
+    }
+
+    function animateReveal() {
+      if (!revealState) return;
+
+      const elapsed = Date.now() - revealState.startTime;
+
+      if (elapsed < REVEAL_HOLD_MS) {
+        // Hold phase: keep the slice highlighted with a pulse
+        drawWheelWithHighlight('hold', elapsed);
+        requestAnimationFrame(animateReveal);
+      } else {
+        // Fall phase: slice flies off the wheel
+        const fallElapsed = elapsed - REVEAL_HOLD_MS;
+        const fallProgress = Math.min(fallElapsed / REVEAL_FALL_MS, 1);
+        drawWheelWithHighlight('fall', fallProgress);
+
+        if (fallProgress < 1) {
+          requestAnimationFrame(animateReveal);
+        } else {
+          // Animation done — perform the actual elimination
+          const state = revealState;
+          revealState = null;
+          completeElimination(state.winnerIndex, state.winnerName, state.isFinal);
+        }
+      }
+    }
+
+    function drawWheelWithHighlight(phase, value) {
+      ctx.clearRect(0, 0, size, size);
+
+      if (items.length === 0) return;
+
+      const anglePerItem = (Math.PI * 2) / items.length;
+      const revealIdx = revealState.itemIndex;
+      const midAngle = revealIdx * anglePerItem + anglePerItem / 2;
+
+      let fontSize;
+      if (items.length <= 4) fontSize = 28;
+      else if (items.length <= 6) fontSize = 24;
+      else if (items.length <= 10) fontSize = 20;
+      else if (items.length <= 15) fontSize = 16;
+      else fontSize = 14;
+
+      // --- Draw all non-highlighted slices ---
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(rotation);
+      ctx.translate(-center, -center);
+
+      items.forEach((item, i) => {
+        if (i === revealIdx) return;
+
+        const startAngle = i * anglePerItem;
+        const endAngle = startAngle + anglePerItem;
+
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fillStyle = colors[i] || '#666';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        const textAngle = startAngle + anglePerItem / 2;
+        const textDist = radius * 0.75;
+        const textX = center + Math.cos(textAngle) * textDist;
+        const textY = center + Math.sin(textAngle) * textDist;
+        ctx.save();
+        ctx.translate(textX, textY);
+        ctx.rotate(textAngle + Math.PI / 2);
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(item.length > 12 ? item.substring(0, 11) + '…' : item, 0, 0);
+        ctx.restore();
+      });
+
+      ctx.restore();
+
+      // --- Draw the highlighted (selected) slice on top ---
+      const startAngle = revealIdx * anglePerItem;
+      const endAngle = startAngle + anglePerItem;
+
+      let expandedRadius = radius + 30;
+      let offsetX = 0;
+      let offsetY = 0;
+      let alpha = 1;
+
+      if (phase === 'hold') {
+        // Pulse the expansion: breathes in and out every ~2s
+        const t = value / 1000;
+        expandedRadius = radius + 30 + Math.sin(t * Math.PI * 1.5) * 10;
+      } else {
+        // Fall: accelerate outward along the slice's bisector and fade
+        const eased = value * value; // easeIn acceleration
+        const fallDist = eased * (size + 400);
+        offsetX = Math.cos(midAngle) * fallDist;
+        offsetY = Math.sin(midAngle) * fallDist;
+        alpha = Math.max(0, 1 - value * 0.8);
+      }
+
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(rotation);
+      ctx.translate(-center, -center);
+      ctx.globalAlpha = alpha;
+      ctx.translate(offsetX, offsetY);
+
+      // During hold: clip to this slice's angular sector so the expansion
+      // protrudes outward only, without bleeding into neighboring slices
+      if (phase === 'hold') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, size, startAngle, endAngle);
+        ctx.closePath();
+        ctx.clip();
+      }
+
+      // Gold glow
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = phase === 'hold' ? 30 : 15;
+
+      ctx.beginPath();
+      ctx.moveTo(center, center);
+      ctx.arc(center, center, expandedRadius, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = colors[revealIdx] || '#666';
+      ctx.fill();
+
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Text on highlighted slice
+      const textDist = expandedRadius * 0.7;
+      const textX = center + Math.cos(midAngle) * textDist;
+      const textY = center + Math.sin(midAngle) * textDist;
+      ctx.save();
+      ctx.translate(textX, textY);
+      ctx.rotate(midAngle + Math.PI / 2);
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${fontSize + 2}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = 6;
+      ctx.fillText(items[revealIdx].length > 12 ? items[revealIdx].substring(0, 11) + '…' : items[revealIdx], 0, 0);
+      ctx.restore();
+
+      if (phase === 'hold') {
+        ctx.restore(); // remove clip
+      }
+
+      ctx.restore();
+
+      // --- Center circle (always on top) ---
+      ctx.beginPath();
+      ctx.arc(center, center, 35, 0, Math.PI * 2);
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(center, center, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#4ecdc4';
+      ctx.fill();
+    }
+
+    function completeElimination(winnerIndex, winnerName, isFinal) {
+      if (isFinal) {
+        // Final round: the picked item is eliminated, the remaining one wins
+        lastEliminated = winnerName;
+        eliminatedItems.push(winnerName);
         items.splice(winnerIndex, 1);
         colors.splice(winnerIndex, 1);
-        
-        // The remaining item is the winner
         finalWinner = items[0];
-        
+
         renderList();
         renderEliminatedList();
         drawWheel();
         updateProgressStatus();
-        
-        // Show final winner
+
         document.getElementById('winner').textContent = finalWinner;
         celebrate(finalWinner, true);
         showWinnerOverlay(finalWinner);
       } else {
         // Normal elimination round
-        lastEliminated = winnerName; // Track for runner-up display
+        lastEliminated = winnerName;
         eliminatedItems.push(winnerName);
         items.splice(winnerIndex, 1);
         colors.splice(winnerIndex, 1);
         eliminationRound++;
-        
+
         renderList();
         renderEliminatedList();
         drawWheel();
-        updateProgressStatus();
-        
-        // Show eliminated item with custom message
+        updateProgressStatus(); // also re-enables spinBtn when items.length >= 2
+
         const eliminationMsg = document.getElementById('eliminationMessage').value.trim() || 'eliminated';
         document.getElementById('winner').textContent = `${winnerName} ${eliminationMsg}!`;
-        
-        // Small celebration for elimination (shorter)
         celebrate(winnerName, false);
-        
-        // Check if we somehow got to 1 item (edge case)
+
         if (items.length === 1) {
           finalWinner = items[0];
-          // Keep the single remaining color
           colors = [colors[0]];
           setTimeout(() => {
             document.getElementById('winner').textContent = finalWinner;
