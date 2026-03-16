@@ -214,6 +214,55 @@
       text-decoration: none;
       display: inline-block;
     }
+    /* Per-item color picker */
+    .item-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .color-swatch-wrap {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+      min-width: 37px; /* reserves space for swatch + optional reset btn */
+    }
+    .color-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.25);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: border-color 0.15s, transform 0.15s;
+      /* override generic label styles */
+      display: block;
+      margin-bottom: 0;
+      font-weight: normal;
+    }
+    .color-swatch:hover { border-color: rgba(255,255,255,0.7); transform: scale(1.2); }
+    .color-swatch.pinned { border-color: #ffd700; border-width: 2px; }
+    .color-reset-btn {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,100,100,0.3);
+      color: #ff6464;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .color-reset-btn:hover { background: rgba(255,100,100,0.65); }
     .elimination-controls {
       display: none;
       margin-top: 12px;
@@ -572,6 +621,7 @@
     let eliminationRound = 0;
     let finalWinner = null;
     let lastEliminated = null; // Track the most recently eliminated item for runner-up display
+    let pinnedColors = {}; // { itemName: '#rrggbb' } — user-overridden colors per item
 
     // Preload ta-da sound (CC0 brass fanfare from freesound.org/people/plasterbrain/sounds/397353/)
     const taDaAudio = new Audio('https://cdn.freesound.org/previews/397/397353_4284968-lq.mp3');
@@ -979,6 +1029,7 @@
       eliminationRound = 0;
       finalWinner = null;
       lastEliminated = null; // Reset runner-up tracking
+      pinnedColors = {};
       renderList();
       renderEliminatedList();
       drawWheel();
@@ -996,32 +1047,47 @@
       }
       generateColors();
       drawWheel();
+      renderList();
     }
     
+    // Convert HSL (0-360, 0-100, 0-100) to a #rrggbb hex string
+    function hslToHex(h, s, l) {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    }
+
     function generateColors() {
-      // Only generate new colors if we don't have original colors stored
-      // or if we're in normal mode and adding new items
       if (gameMode === 'normal' || originalColors.length === 0) {
         colors = [];
-        // Pick random colors from the full palette, not just sequential ones
-        const shuffledPalette = [...palette];
-        // Shuffle the palette first
-        for (let i = shuffledPalette.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffledPalette[i], shuffledPalette[j]] = [shuffledPalette[j], shuffledPalette[i]];
-        }
-        // Take colors from the shuffled palette
-        for (let i = 0; i < items.length; i++) {
-          colors.push(shuffledPalette[i % shuffledPalette.length]);
+        const n = items.length;
+        // Evenly space hues around the full 360° wheel from a random starting point.
+        // Adjacent slices are always 360/n degrees apart — maximum possible contrast
+        // regardless of how many items there are.
+        const startHue = Math.random() * 360;
+        for (let i = 0; i < n; i++) {
+          if (pinnedColors[items[i]]) {
+            colors.push(pinnedColors[items[i]]);
+          } else {
+            const hue = (startHue + (i * 360) / n) % 360;
+            // Alternate lightness between adjacent slices for extra separation
+            const lightness = i % 2 === 0 ? 58 : 46;
+            colors.push(hslToHex(hue, 72, lightness));
+          }
         }
         // Store as original colors for elimination mode
         originalColors = [...colors];
       } else {
         // In elimination mode with existing original colors,
-        // filter colors to match remaining items
+        // filter colors to match remaining items, respecting pinned overrides
         colors = items.map(item => {
           const originalIndex = originalItems.indexOf(item);
-          return originalColors[originalIndex];
+          return pinnedColors[item] || originalColors[originalIndex];
         });
       }
     }
@@ -1038,12 +1104,28 @@
       
       countEl.textContent = `(${items.length})`;
       
-      list.innerHTML = items.map((item, i) => `
-        <div class="item">
-          <span>${escapeHtml(item)}</span>
-          <button onclick="removeItem(${i})">Remove</button>
-        </div>
-      `).join('');
+      list.innerHTML = items.map((item, i) => {
+        const color = colors[i] || '#888888';
+        const isPinned = !!pinnedColors[item];
+        return `
+          <div class="item">
+            <div class="item-left">
+              <div class="color-swatch-wrap">
+                <div class="color-swatch${isPinned ? ' pinned' : ''}"
+                     style="background:${color}"
+                     onclick="openColorPicker(${i})"
+                     title="${isPinned ? 'Custom color — click to change' : 'Click to set a custom color'}"></div>
+                <input type="color" id="cp_${i}" value="${color}"
+                       style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;"
+                       onchange="setPinnedColor(${i}, this.value)">
+                ${isPinned ? `<button class="color-reset-btn" onclick="removePinnedColor(${i})" title="Reset to auto color">×</button>` : ''}
+              </div>
+              <span>${escapeHtml(item)}</span>
+            </div>
+            <button onclick="removeItem(${i})">Remove</button>
+          </div>
+        `;
+      }).join('');
     }
     
     function renderEliminatedList() {
@@ -1073,7 +1155,51 @@
       div.textContent = text;
       return div.innerHTML;
     }
-    
+
+    // --- Per-item color picker ---
+
+    function openColorPicker(index) {
+      const input = document.getElementById('cp_' + index);
+      if (input) input.click();
+    }
+
+    function setPinnedColor(index, hexColor) {
+      if (index < 0 || index >= items.length) return;
+      const itemName = items[index];
+      pinnedColors[itemName] = hexColor;
+      colors[index] = hexColor;
+      // Keep originalColors in sync (used by elimination mode restore)
+      if (originalColors.length > 0) {
+        if (gameMode === 'elimination' && originalItems.length > 0) {
+          const origIdx = originalItems.indexOf(itemName);
+          if (origIdx > -1) originalColors[origIdx] = hexColor;
+        } else if (index < originalColors.length) {
+          originalColors[index] = hexColor;
+        }
+      }
+      drawWheel();
+      renderList();
+    }
+
+    function removePinnedColor(index) {
+      if (index < 0 || index >= items.length) return;
+      const itemName = items[index];
+      delete pinnedColors[itemName];
+      // Assign a fresh random color from the palette
+      const newColor = palette[Math.floor(Math.random() * palette.length)];
+      colors[index] = newColor;
+      if (originalColors.length > 0) {
+        if (gameMode === 'elimination' && originalItems.length > 0) {
+          const origIdx = originalItems.indexOf(itemName);
+          if (origIdx > -1) originalColors[origIdx] = newColor;
+        } else if (index < originalColors.length) {
+          originalColors[index] = newColor;
+        }
+      }
+      drawWheel();
+      renderList();
+    }
+
     function drawWheel() {
       // Don't overwrite an active reveal animation
       if (revealState) return;
