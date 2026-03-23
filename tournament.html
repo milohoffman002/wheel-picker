@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wheel of Power Tournament</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    body.fullscreen {
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    body.fullscreen .container {
+      max-width: 100%;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 6px;
+      font-size: 32px;
+      background: linear-gradient(135deg, #ffd700 0%, #ff6b6b 50%, #f093fb 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle { text-align: center; color: #888; margin-bottom: 24px; font-size: 14px; }
+    body.fullscreen h1,
+    body.fullscreen .subtitle { display: none; }
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      gap: 24px;
+    }
+    body.fullscreen .layout {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      padding: 18px;
+    }
+    body.fullscreen .panel.setup-panel { display: none; }
+    body.fullscreen .panel.scoreboard-panel { display: none; }
+    body.fullscreen .panel.wheel-panel {
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 10px;
+      color: #fff;
+      font-size: 14px;
+      resize: vertical;
+      font-family: inherit;
+    }
+    textarea:focus { outline: none; border-color: #ffd700; }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #ffd700, #ff9f43);
+      color: #1a1a2e;
+    }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    .btn-danger {
+      background: rgba(255,100,100,0.2);
+      color: #ff6464;
+    }
+
+    /* Items list */
+    .items-list { margin-top: 14px; }
+    .items-list h3 { margin-bottom: 8px; font-size: 13px; color: #888; }
+    .item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255,255,255,0.03);
+      padding: 6px 10px;
+      margin-bottom: 4px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .item-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    .color-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .item button {
+      padding: 3px 8px;
+      font-size: 11px;
+      background: rgba(255,100,100,0.2);
+      color: #ff6464;
+    }
+    .challenge-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: rgba(255,215,0,0.2);
+      color: #ffd700;
+      border-radius: 4px;
+      margin-left: 4px;
+    }
+
+    /* Wheel area */
+    .wheel-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: transparent;
+    }
+    .wheel-wrapper {
+      position: relative;
+      width: 400px;
+      height: 400px;
+      margin-bottom: 16px;
+    }
+    body.fullscreen .wheel-wrapper {
+      width: min(70vh, 70vw);
+      height: min(70vh, 70vw);
+      max-width: 650px;
+      max-height: 650px;
+    }
+    .pointer {
+      position: absolute;
+      top: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-top: 32px solid #ffd700;
+      z-index: 10;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+    }
+    canvas { width: 100%; height: 100%; }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+    }
+    .spin-btn {
+      padding: 14px 50px;
+      font-size: 20px;
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: #fff;
+      box-shadow: 0 10px 30px rgba(245, 87, 108, 0.4);
+    }
+    .spin-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 40px rgba(245, 87, 108, 0.5);
+    }
+    .spin-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Fullscreen button */
+    .fullscreen-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #fff;
+      display: none;
+    }
+    body:not(.fullscreen) .panel .fullscreen-btn { display: block; }
+    .exit-fullscreen {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #fff;
+      z-index: 100;
+      display: none;
+    }
+    body.fullscreen .exit-fullscreen { display: block; }
+
+    /* Decision panel - shown after spin */
+    .decision-panel {
+      display: none;
+      background: rgba(255,215,0,0.08);
+      border: 2px solid rgba(255,215,0,0.3);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      width: 100%;
+      max-width: 400px;
+      animation: fadeIn 0.3s ease;
+    }
+    .decision-panel.show { display: block; }
+    .decision-panel h3 {
+      font-size: 22px;
+      color: #ffd700;
+      margin-bottom: 4px;
+    }
+    .decision-panel .selected-name {
+      font-size: 32px;
+      font-weight: 700;
+      color: #4ecdc4;
+      margin-bottom: 16px;
+    }
+    .decision-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .btn-challenge {
+      background: linear-gradient(135deg, #ffd700, #ff9f43);
+      color: #1a1a2e;
+      padding: 14px 32px;
+      font-size: 18px;
+    }
+    .btn-challenge:hover { transform: translateY(-2px); }
+    .btn-challenge:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-go-next {
+      background: rgba(255,100,100,0.3);
+      color: #ff6464;
+      padding: 14px 32px;
+      font-size: 18px;
+    }
+    .btn-go-next:hover { transform: translateY(-2px); }
+
+    /* Challenge result buttons */
+    .challenge-result {
+      display: none;
+      margin-top: 14px;
+    }
+    .challenge-result.show { display: flex; gap: 12px; justify-content: center; }
+    .btn-won {
+      background: linear-gradient(135deg, #1dd1a1, #00b894);
+      color: #fff;
+      padding: 14px 40px;
+      font-size: 18px;
+    }
+    .btn-won:hover { transform: translateY(-2px); }
+    .btn-lost {
+      background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+      color: #fff;
+      padding: 14px 40px;
+      font-size: 18px;
+    }
+    .btn-lost:hover { transform: translateY(-2px); }
+
+    /* Winner display */
+    .winner-box {
+      text-align: center;
+      padding: 16px 30px;
+      background: rgba(78, 205, 196, 0.15);
+      border: 2px solid rgba(78, 205, 196, 0.4);
+      border-radius: 16px;
+      font-size: 20px;
+      min-width: 250px;
+      transition: all 0.3s ease;
+    }
+    .winner-box.celebrating {
+      animation: winnerPulse 0.5s ease-in-out 3;
+      background: linear-gradient(135deg, rgba(78, 205, 196, 0.3), rgba(245, 87, 108, 0.3));
+      border-color: #4ecdc4;
+    }
+    body.fullscreen .winner-box {
+      font-size: 28px;
+      padding: 20px 40px;
+    }
+    body.fullscreen .winner-box.celebrating {
+      font-size: 36px;
+    }
+    body.fullscreen .decision-panel .selected-name {
+      font-size: 48px;
+    }
+    @keyframes winnerPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Play Again button (visible after round ends and overlay is closed) */
+    .play-again-btn {
+      display: none;
+      margin-top: 10px;
+    }
+    .play-again-btn.show { display: inline-block; }
+
+    /* Scoreboard panel */
+    .scoreboard-panel h3 {
+      font-size: 15px;
+      margin-bottom: 10px;
+      color: #ffd700;
+    }
+    .round-info {
+      font-size: 13px;
+      color: #4ecdc4;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .score-stack {
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 0;
+    }
+    .score-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .score-entry.eliminated {
+      background: rgba(255,100,100,0.08);
+      border-left: 3px solid #ff6464;
+    }
+    .score-entry.winner {
+      background: rgba(255,215,0,0.12);
+      border-left: 3px solid #ffd700;
+    }
+    .score-entry .name { font-weight: 600; }
+    .score-entry .points {
+      font-weight: 700;
+      min-width: 40px;
+      text-align: right;
+    }
+    .score-entry .points.positive { color: #1dd1a1; }
+    .score-entry .points.negative { color: #ff6464; }
+    .score-entry .detail {
+      font-size: 11px;
+      color: #666;
+      margin-left: 6px;
+    }
+
+    /* Tournament totals */
+    .tournament-totals {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .tournament-totals h3 {
+      font-size: 14px;
+      color: #f093fb;
+      margin-bottom: 8px;
+    }
+    .total-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 12px;
+      margin-bottom: 3px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .total-entry:first-child {
+      background: rgba(255,215,0,0.12);
+      border-left: 3px solid #ffd700;
+    }
+    .total-entry .name { font-weight: 600; }
+    .total-entry .total-pts {
+      font-weight: 700;
+      color: #ffd700;
+    }
+
+    /* Round complete overlay */
+    .round-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.92);
+      z-index: 2000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.5s ease;
+    }
+    .round-overlay.show { display: flex; }
+    .round-overlay h2 {
+      font-size: 42px;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffd700 0%, #ff6b6b 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .round-overlay .round-label {
+      font-size: 18px;
+      color: #888;
+      margin-bottom: 24px;
+    }
+    .round-overlay .final-scores {
+      max-width: 400px;
+      width: 90%;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+    .round-overlay .final-scores .score-entry {
+      margin-bottom: 4px;
+    }
+    .round-overlay .overlay-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .round-overlay .overlay-buttons button {
+      padding: 14px 36px;
+      font-size: 16px;
+    }
+
+    /* Sound toggle */
+    .sound-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 12px;
+      color: #888;
+      cursor: pointer;
+    }
+    .sound-toggle input { cursor: pointer; }
+
+    /* Confetti */
+    #confetti-canvas {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .min-items-warning {
+      color: #ff6464;
+      font-size: 12px;
+      margin-top: 6px;
+      display: none;
+    }
+    .min-items-warning.show { display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="confetti-canvas"></canvas>
+
+  <div class="container">
+    <h1>Wheel of Power Tournament</h1>
+    <p class="subtitle">Spin. Challenge. Survive. The last one standing wins the round!</p>
+
+    <div class="layout">
+      <!-- Left: Player setup -->
+      <div class="panel setup-panel">
+        <label for="itemInput">Players (one per line)</label>
+        <textarea id="itemInput" placeholder="Alice&#10;Bob&#10;Charlie&#10;Diana"></textarea>
+
+        <div class="btn-row">
+          <button class="btn-primary" onclick="addItems()">Add Players</button>
+          <button class="btn-secondary" onclick="shuffleColors()">Shuffle Colors</button>
+          <button class="btn-danger" onclick="clearAll()">Clear</button>
+        </div>
+
+        <div class="min-items-warning" id="minItemsWarning">Need at least 2 players</div>
+
+        <div class="items-list">
+          <h3>Players <span id="activeCount"></span></h3>
+          <div id="itemsList"></div>
+        </div>
+
+        <label class="sound-toggle">
+          <input type="checkbox" id="soundToggle" checked>
+          Enable sounds
+        </label>
+      </div>
+
+      <!-- Center: Wheel -->
+      <div class="panel wheel-panel">
+        <button class="fullscreen-btn" onclick="toggleFullscreen()">&#x26F6; Full Screen</button>
+        <div class="wheel-wrapper">
+          <div class="pointer"></div>
+          <canvas id="wheel" width="900" height="900"></canvas>
+        </div>
+
+        <div class="controls">
+          <button class="spin-btn" id="spinBtn" onclick="spin()">Spin the Wheel</button>
+
+          <div class="decision-panel" id="decisionPanel">
+            <h3>The wheel has chosen...</h3>
+            <div class="selected-name" id="selectedName"></div>
+            <div class="decision-buttons" id="decisionButtons">
+              <button class="btn-challenge" id="challengeBtn" onclick="doChallenge()">Challenge</button>
+              <button class="btn-go-next" onclick="doGoNext()">Go Next</button>
+            </div>
+            <div class="challenge-result" id="challengeResult">
+              <button class="btn-won" onclick="challengeWon()">WON</button>
+              <button class="btn-lost" onclick="challengeLost()">LOST</button>
+            </div>
+          </div>
+
+          <div class="winner-box" id="winnerBox" style="display:none">
+            <span id="winnerText"></span>
+          </div>
+
+          <button class="btn-primary play-again-btn" id="playAgainBtn" onclick="playAgain()">Play Next Round</button>
+        </div>
+      </div>
+
+      <!-- Right: Scoreboard -->
+      <div class="panel scoreboard-panel">
+        <h3>Round Scoreboard</h3>
+        <div class="round-info" id="roundInfo">Add players to begin</div>
+        <div class="score-stack" id="scoreStack"></div>
+
+        <div class="tournament-totals" id="tournamentTotals" style="display:none">
+          <h3>Tournament Standings</h3>
+          <div id="totalsList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="exit-fullscreen" onclick="toggleFullscreen()">&#x2715; Exit Full Screen</button>
+
+  <!-- Round Complete Overlay -->
+  <div class="round-overlay" id="roundOverlay">
+    <h2 id="overlayTitle">Round Complete!</h2>
+    <div class="round-label" id="overlayRoundLabel"></div>
+    <div class="final-scores" id="overlayScores"></div>
+    <div class="overlay-buttons">
+      <button class="btn-primary" onclick="playAgain()">Play Again</button>
+      <button class="btn-secondary" onclick="closeOverlay()">View Scores</button>
+    </div>
+  </div>
+
+  <script>
+    // ---- State ----
+    let items = [];
+    let colors = [];
+    let allPlayers = [];
+    let rotation = 0;
+    let isSpinning = false;
+    let audioContext = null;
+
+    // Current spin state
+    let currentSelected = null; // { index, name }
+
+    // Reveal animation state (slice expand, hold, then fall off on elimination)
+    let revealState = null; // null or { itemIndex, winnerIndex, winnerName, startTime, phase }
+    // phase: 'hold' = pulsing highlight, 'fall' = flying off wheel
+    const REVEAL_HOLD_MS = 1500;
+    const REVEAL_FALL_MS = 700;
+    let highlightState = null; // persists after hold animation to keep slice highlighted during decision
+
+    // Round state
+    let roundNumber = 0;
+    let eliminationOrder = [];
+    let challengeUsedThisRound = new Set();
+    let roundComplete = false;
+
+    // Tournament state
+    let tournamentScores = {};
+    let roundHistory = [];
+
+    // Audio
+    const taDaAudio = new Audio('https://cdn.freesound.org/previews/397/397353_4284968-lq.mp3');
+    taDaAudio.preload = 'auto';
+
+    // Canvas
+    const canvas = document.getElementById('wheel');
+    const ctx = canvas.getContext('2d');
+    const size = canvas.width;
+    const center = size / 2;
+    const radius = center - 70;
+
+    // Confetti
+    const confettiCanvas = document.getElementById('confetti-canvas');
+    const confettiCtx = confettiCanvas.getContext('2d');
+    let confettiParticles = [];
+    let confettiAnimationId = null;
+
+    function resizeConfetti() {
+      confettiCanvas.width = window.innerWidth;
+      confettiCanvas.height = window.innerHeight;
+    }
+    resizeConfetti();
+    window.addEventListener('resize', resizeConfetti);
+
+    // ---- Audio (matching index.html) ----
+    function initAudio() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') audioContext.resume();
+    }
+
+    function playClick() {
+      if (!document.getElementById('soundToggle').checked) return;
+      if (!audioContext) initAudio();
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      osc.frequency.setValueAtTime(800, audioContext.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.03);
+      gain.gain.setValueAtTime(0.15, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.03);
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      osc.start(audioContext.currentTime);
+      osc.stop(audioContext.currentTime + 0.03);
+    }
+
+    function playFanfare() {
+      if (!document.getElementById('soundToggle').checked) return;
+      if (!audioContext) initAudio();
+      const now = audioContext.currentTime;
+      playChord(now, [261.63, 329.63, 392.00], 0.3);
+      playChord(now + 0.15, [349.23, 440.00, 523.25], 0.3);
+      playChord(now + 0.30, [392.00, 493.88, 587.33], 0.3);
+      playChord(now + 0.45, [261.63, 329.63, 392.00, 523.25], 0.8);
+    }
+
+    function playChord(time, frequencies, duration) {
+      frequencies.forEach(freq => {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, time);
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(0.2, time + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.start(time);
+        osc.stop(time + duration);
+      });
+    }
+
+    function playTaDa() {
+      if (!document.getElementById('soundToggle').checked) return;
+      taDaAudio.currentTime = 0;
+      taDaAudio.play().catch(() => {
+        if (!audioContext) initAudio();
+        const now = audioContext.currentTime;
+        playChord(now, [196.00, 261.63], 0.2);
+        playChord(now + 0.24, [261.63, 329.63, 392.00], 0.75);
+      });
+    }
+
+    function playElimSound() {
+      if (!document.getElementById('soundToggle').checked) return;
+      if (!audioContext) initAudio();
+      const now = audioContext.currentTime;
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(400, now);
+      osc.frequency.exponentialRampToValueAtTime(100, now + 0.4);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      osc.start(now);
+      osc.stop(now + 0.4);
+    }
+
+    function playChallengeWinSound() {
+      if (!document.getElementById('soundToggle').checked) return;
+      if (!audioContext) initAudio();
+      const now = audioContext.currentTime;
+      playChord(now, [329.63, 392.00], 0.15);
+      playChord(now + 0.15, [440.00, 523.25], 0.3);
+    }
+
+    // ---- Confetti ----
+    function createConfetti() {
+      confettiParticles = [];
+      const cols = ['#ff6b6b', '#feca57', '#54a0ff', '#5f27cd', '#1dd1a1', '#ff9f43', '#48dbfb', '#ff9ff3'];
+      for (let i = 0; i < 150; i++) {
+        confettiParticles.push({
+          x: Math.random() * confettiCanvas.width,
+          y: -20 - Math.random() * 100,
+          color: cols[Math.floor(Math.random() * cols.length)],
+          size: 8 + Math.random() * 8,
+          speedY: 3 + Math.random() * 4,
+          speedX: (Math.random() - 0.5) * 4,
+          rotation: Math.random() * 360,
+          rotationSpeed: (Math.random() - 0.5) * 10,
+          sway: Math.random() * 0.1,
+          swayOffset: Math.random() * Math.PI * 2
+        });
+      }
+      animateConfetti();
+    }
+
+    function animateConfetti() {
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      let active = 0;
+      confettiParticles.forEach(p => {
+        p.y += p.speedY;
+        p.x += p.speedX + Math.sin(p.y * p.sway + p.swayOffset) * 2;
+        p.rotation += p.rotationSpeed;
+        if (p.y < confettiCanvas.height + 20) {
+          active++;
+          confettiCtx.save();
+          confettiCtx.translate(p.x, p.y);
+          confettiCtx.rotate(p.rotation * Math.PI / 180);
+          confettiCtx.fillStyle = p.color;
+          confettiCtx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+          confettiCtx.restore();
+        }
+      });
+      if (active > 0) confettiAnimationId = requestAnimationFrame(animateConfetti);
+    }
+
+    function stopConfetti() {
+      if (confettiAnimationId) {
+        cancelAnimationFrame(confettiAnimationId);
+        confettiAnimationId = null;
+      }
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    }
+
+    function celebrate(isFinal = false) {
+      playFanfare();
+      createConfetti();
+      setTimeout(stopConfetti, isFinal ? 6000 : 3000);
+    }
+
+    // ---- Fullscreen ----
+    function toggleFullscreen() {
+      document.body.classList.toggle('fullscreen');
+      drawWheel();
+    }
+
+    // ---- Color generation ----
+    function hslToHex(h, s, l) {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    }
+
+    function generateColors() {
+      colors = [];
+      const n = items.length;
+      const startHue = Math.random() * 360;
+      for (let i = 0; i < n; i++) {
+        const hue = (startHue + (i * 360) / n) % 360;
+        const lightness = i % 2 === 0 ? 58 : 46;
+        colors.push(hslToHex(hue, 72, lightness));
+      }
+    }
+
+    function shuffleColors() {
+      generateColors();
+      drawWheel();
+      renderList();
+    }
+
+    // ---- Items management ----
+    function addItems() {
+      const input = document.getElementById('itemInput');
+      const lines = input.value.split('\n').map(s => s.trim()).filter(s => s);
+      if (lines.length === 0) return;
+
+      items = [...items, ...lines];
+      allPlayers = [...items];
+      input.value = '';
+
+      allPlayers.forEach(p => {
+        if (!(p in tournamentScores)) tournamentScores[p] = 0;
+      });
+
+      eliminationOrder = [];
+      challengeUsedThisRound = new Set();
+      roundComplete = false;
+      roundNumber = Math.max(roundNumber, 1);
+
+      generateColors();
+      renderList();
+      drawWheel();
+      updateStatus();
+      updatePlayAgainBtn();
+    }
+
+    function removeItem(index) {
+      const removed = items[index];
+      items.splice(index, 1);
+      colors.splice(index, 1);
+
+      const ai = allPlayers.indexOf(removed);
+      if (ai > -1) allPlayers.splice(ai, 1);
+      delete tournamentScores[removed];
+
+      renderList();
+      drawWheel();
+      updateStatus();
+    }
+
+    function clearAll() {
+      items = [];
+      colors = [];
+      allPlayers = [];
+      rotation = 0;
+      eliminationOrder = [];
+      challengeUsedThisRound = new Set();
+      roundNumber = 0;
+      roundComplete = false;
+      tournamentScores = {};
+      roundHistory = [];
+      currentSelected = null;
+      revealState = null;
+      highlightState = null;
+
+      renderList();
+      drawWheel();
+      updateStatus();
+      renderScoreboard();
+      renderTournamentTotals();
+      hideDecision();
+      updatePlayAgainBtn();
+
+      document.getElementById('winnerBox').style.display = 'none';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- Rendering ----
+    function renderList() {
+      const list = document.getElementById('itemsList');
+      const countEl = document.getElementById('activeCount');
+
+      if (items.length === 0) {
+        list.innerHTML = '<div style="color:#666;font-size:13px;">No players yet</div>';
+        countEl.textContent = '';
+        return;
+      }
+
+      countEl.textContent = `(${items.length})`;
+      list.innerHTML = items.map((item, i) => {
+        const color = colors[i] || '#888';
+        const usedChallenge = challengeUsedThisRound.has(item);
+        return `
+          <div class="item">
+            <div class="item-left">
+              <div class="color-dot" style="background:${color}"></div>
+              <span>${escapeHtml(item)}</span>
+              ${usedChallenge ? '<span class="challenge-badge">CHALLENGED</span>' : ''}
+            </div>
+            <button onclick="removeItem(${i})">Remove</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateStatus() {
+      const warningEl = document.getElementById('minItemsWarning');
+      const spinBtn = document.getElementById('spinBtn');
+      const roundInfo = document.getElementById('roundInfo');
+
+      if (items.length < 2 || roundComplete) {
+        if (items.length < 2 && !roundComplete) warningEl.classList.add('show');
+        else warningEl.classList.remove('show');
+        spinBtn.disabled = true;
+      } else {
+        warningEl.classList.remove('show');
+        spinBtn.disabled = false;
+      }
+
+      if (allPlayers.length === 0 || roundNumber === 0) {
+        roundInfo.textContent = 'Add players to begin';
+      } else {
+        roundInfo.textContent = `Round ${roundNumber} \u2022 ${items.length} of ${allPlayers.length} remaining`;
+      }
+    }
+
+    function updatePlayAgainBtn() {
+      const btn = document.getElementById('playAgainBtn');
+      if (roundComplete) {
+        btn.classList.add('show');
+      } else {
+        btn.classList.remove('show');
+      }
+    }
+
+    // ---- Wheel drawing ----
+    function drawWheel() {
+      // Don't overwrite an active reveal/highlight animation
+      if (revealState) return;
+      if (highlightState) { drawWheelWithHighlightStatic(); return; }
+      drawWheelBase();
+    }
+
+    function drawWheelBase() {
+      ctx.clearRect(0, 0, size, size);
+
+      if (items.length === 0) {
+        ctx.beginPath();
+        ctx.arc(center, center, radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        return;
+      }
+
+      const anglePerItem = (Math.PI * 2) / items.length;
+
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(rotation);
+      ctx.translate(-center, -center);
+
+      let fontSize;
+      if (items.length <= 4) fontSize = 28;
+      else if (items.length <= 6) fontSize = 24;
+      else if (items.length <= 10) fontSize = 20;
+      else if (items.length <= 15) fontSize = 16;
+      else fontSize = 14;
+
+      items.forEach((item, i) => {
+        const startAngle = i * anglePerItem;
+        const endAngle = startAngle + anglePerItem;
+
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fillStyle = colors[i] || '#666';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        const textAngle = startAngle + anglePerItem / 2;
+        const textDist = radius * 0.75;
+        const textX = center + Math.cos(textAngle) * textDist;
+        const textY = center + Math.sin(textAngle) * textDist;
+
+        ctx.save();
+        ctx.translate(textX, textY);
+        ctx.rotate(textAngle + Math.PI / 2);
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 4;
+        const displayText = item.length > 12 ? item.substring(0, 11) + '\u2026' : item;
+        ctx.fillText(displayText, 0, 0);
+        ctx.restore();
+      });
+
+      ctx.restore();
+
+      // Center circle
+      ctx.beginPath();
+      ctx.arc(center, center, 35, 0, Math.PI * 2);
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(center, center, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd700';
+      ctx.fill();
+    }
+
+    // ---- Reveal animation (slice expand + hold, fall only on elimination) ----
+    function startRevealAnimation(winnerIndex, winnerName) {
+      playTaDa();
+      revealState = {
+        itemIndex: winnerIndex,
+        winnerIndex: winnerIndex,
+        winnerName: winnerName,
+        startTime: Date.now(),
+        phase: 'hold'
+      };
+      animateReveal();
+    }
+
+    function animateReveal() {
+      if (!revealState) return;
+
+      if (revealState.phase === 'hold') {
+        const elapsed = Date.now() - revealState.startTime;
+        if (elapsed < REVEAL_HOLD_MS) {
+          drawWheelWithHighlight('hold', elapsed);
+          requestAnimationFrame(animateReveal);
+        } else {
+          // Hold complete — keep slice highlighted, show decision UI
+          highlightState = {
+            itemIndex: revealState.itemIndex,
+            winnerIndex: revealState.winnerIndex,
+            winnerName: revealState.winnerName
+          };
+          revealState = null;
+          // Draw one final highlighted frame (static expanded)
+          drawWheelWithHighlightStatic();
+          currentSelected = { index: highlightState.winnerIndex, name: highlightState.winnerName };
+          showDecision(highlightState.winnerName);
+        }
+      } else if (revealState.phase === 'fall') {
+        const elapsed = Date.now() - revealState.startTime;
+        const fallProgress = Math.min(elapsed / REVEAL_FALL_MS, 1);
+        drawWheelWithHighlight('fall', fallProgress);
+
+        if (fallProgress < 1) {
+          requestAnimationFrame(animateReveal);
+        } else {
+          // Fall complete — clean up and run the callback
+          const cb = revealState.onComplete;
+          revealState = null;
+          highlightState = null;
+          cb();
+        }
+      }
+    }
+
+    // Start the fall-off animation for the currently highlighted slice, then call onComplete
+    function startFallAnimation(onComplete) {
+      if (!highlightState) {
+        onComplete();
+        return;
+      }
+      revealState = {
+        itemIndex: highlightState.itemIndex,
+        winnerIndex: highlightState.winnerIndex,
+        winnerName: highlightState.winnerName,
+        startTime: Date.now(),
+        phase: 'fall',
+        onComplete: onComplete
+      };
+      animateReveal();
+    }
+
+    // Clear the highlight without any fall animation (challenge won — slice stays)
+    function clearHighlight() {
+      highlightState = null;
+      revealState = null;
+      drawWheelBase();
+    }
+
+    // Draw wheel with the highlighted slice in a static expanded state (no animation)
+    function drawWheelWithHighlightStatic() {
+      if (!highlightState) { drawWheelBase(); return; }
+      // Reuse the highlight drawing with a fixed hold value (reads from highlightState)
+      drawWheelWithHighlight('hold', REVEAL_HOLD_MS);
+    }
+
+    function drawWheelWithHighlight(phase, value) {
+      ctx.clearRect(0, 0, size, size);
+      if (items.length === 0) return;
+
+      const anglePerItem = (Math.PI * 2) / items.length;
+      const state = revealState || highlightState;
+      if (!state) { drawWheelBase(); return; }
+      const revealIdx = state.itemIndex;
+      const midAngle = revealIdx * anglePerItem + anglePerItem / 2;
+
+      let fontSize;
+      if (items.length <= 4) fontSize = 28;
+      else if (items.length <= 6) fontSize = 24;
+      else if (items.length <= 10) fontSize = 20;
+      else if (items.length <= 15) fontSize = 16;
+      else fontSize = 14;
+
+      // Draw all non-highlighted slices
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(rotation);
+      ctx.translate(-center, -center);
+
+      items.forEach((item, i) => {
+        if (i === revealIdx) return;
+
+        const startAngle = i * anglePerItem;
+        const endAngle = startAngle + anglePerItem;
+
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fillStyle = colors[i] || '#666';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        const textAngle = startAngle + anglePerItem / 2;
+        const textDist = radius * 0.75;
+        const textX = center + Math.cos(textAngle) * textDist;
+        const textY = center + Math.sin(textAngle) * textDist;
+        ctx.save();
+        ctx.translate(textX, textY);
+        ctx.rotate(textAngle + Math.PI / 2);
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(item.length > 12 ? item.substring(0, 11) + '\u2026' : item, 0, 0);
+        ctx.restore();
+      });
+
+      ctx.restore();
+
+      // Draw the highlighted (selected) slice on top
+      const startAngle = revealIdx * anglePerItem;
+      const endAngle = startAngle + anglePerItem;
+
+      let expandedRadius = radius + 30;
+      let offsetX = 0;
+      let offsetY = 0;
+      let alpha = 1;
+
+      if (phase === 'hold') {
+        const t = value / 1000;
+        expandedRadius = radius + 30 + Math.sin(t * Math.PI * 1.5) * 10;
+      } else {
+        const eased = value * value;
+        const fallDist = eased * (size + 400);
+        offsetX = Math.cos(midAngle) * fallDist;
+        offsetY = Math.sin(midAngle) * fallDist;
+        alpha = Math.max(0, 1 - value * 0.8);
+      }
+
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(rotation);
+      ctx.translate(-center, -center);
+      ctx.globalAlpha = alpha;
+      ctx.translate(offsetX, offsetY);
+
+      if (phase === 'hold') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, size, startAngle, endAngle);
+        ctx.closePath();
+        ctx.clip();
+      }
+
+      // Gold glow
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = phase === 'hold' ? 30 : 15;
+
+      ctx.beginPath();
+      ctx.moveTo(center, center);
+      ctx.arc(center, center, expandedRadius, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = colors[revealIdx] || '#666';
+      ctx.fill();
+
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Text on highlighted slice
+      const textDist = expandedRadius * 0.7;
+      const textX = center + Math.cos(midAngle) * textDist;
+      const textY = center + Math.sin(midAngle) * textDist;
+      ctx.save();
+      ctx.translate(textX, textY);
+      ctx.rotate(midAngle + Math.PI / 2);
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${fontSize + 2}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = 6;
+      ctx.fillText(items[revealIdx].length > 12 ? items[revealIdx].substring(0, 11) + '\u2026' : items[revealIdx], 0, 0);
+      ctx.restore();
+
+      if (phase === 'hold') {
+        ctx.restore(); // remove clip
+      }
+
+      ctx.restore();
+
+      // Center circle (always on top)
+      ctx.beginPath();
+      ctx.arc(center, center, 35, 0, Math.PI * 2);
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(center, center, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd700';
+      ctx.fill();
+    }
+
+    // ---- Spin ----
+    function spin() {
+      if (isSpinning || items.length < 2 || roundComplete) return;
+
+      stopConfetti();
+      hideDecision();
+      document.getElementById('winnerBox').style.display = 'none';
+
+      initAudio();
+      isSpinning = true;
+      document.getElementById('spinBtn').disabled = true;
+
+      const minSpins = 5;
+      const maxSpins = 8;
+      const totalSpins = minSpins + Math.random() * (maxSpins - minSpins);
+      const targetRotation = rotation + totalSpins * Math.PI * 2;
+      const duration = 6000;
+      const start = Date.now();
+      const startRotation = rotation;
+
+      let lastClickSegment = -1;
+
+      function animate() {
+        const elapsed = Date.now() - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+
+        rotation = startRotation + (targetRotation - startRotation) * ease;
+
+        if (items.length > 0) {
+          const anglePerItem = (Math.PI * 2) / items.length;
+          const currentSegment = Math.floor(rotation / anglePerItem);
+          if (currentSegment !== lastClickSegment) {
+            playClick();
+            lastClickSegment = currentSegment;
+          }
+        }
+
+        drawWheelBase();
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          isSpinning = false;
+          playClick();
+
+          const normalizedRotation = (rotation % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+          const anglePerItem = (Math.PI * 2) / items.length;
+          let relativeAngle = (3 * Math.PI / 2 - normalizedRotation) % (Math.PI * 2);
+          if (relativeAngle < 0) relativeAngle += Math.PI * 2;
+          const winnerIndex = Math.floor((relativeAngle + 0.0001) / anglePerItem) % items.length;
+          const winnerName = items[winnerIndex];
+
+          // Start the reveal animation (slice expands, then falls off)
+          startRevealAnimation(winnerIndex, winnerName);
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // ---- Decision UI ----
+    function showDecision(name) {
+      const panel = document.getElementById('decisionPanel');
+      document.getElementById('selectedName').textContent = name;
+      document.getElementById('decisionButtons').style.display = 'flex';
+      document.getElementById('challengeResult').classList.remove('show');
+      panel.classList.add('show');
+
+      const challengeBtn = document.getElementById('challengeBtn');
+      if (challengeUsedThisRound.has(name)) {
+        challengeBtn.disabled = true;
+        challengeBtn.title = 'Challenge already used this round';
+      } else {
+        challengeBtn.disabled = false;
+        challengeBtn.title = '';
+      }
+    }
+
+    function hideDecision() {
+      document.getElementById('decisionPanel').classList.remove('show');
+      document.getElementById('challengeResult').classList.remove('show');
+    }
+
+    function doChallenge() {
+      document.getElementById('decisionButtons').style.display = 'none';
+      document.getElementById('challengeResult').classList.add('show');
+    }
+
+    function challengeWon() {
+      if (!currentSelected) return;
+      const name = currentSelected.name;
+
+      challengeUsedThisRound.add(name);
+
+      hideDecision();
+      clearHighlight(); // slice snaps back to normal — they survived
+      playChallengeWinSound();
+
+      const winnerBox = document.getElementById('winnerBox');
+      document.getElementById('winnerText').textContent = `${name} survives the challenge!`;
+      winnerBox.style.display = '';
+      winnerBox.classList.add('celebrating');
+      setTimeout(() => winnerBox.classList.remove('celebrating'), 2000);
+
+      currentSelected = null;
+      renderList();
+
+      document.getElementById('spinBtn').disabled = items.length < 2;
+    }
+
+    function challengeLost() {
+      doGoNext();
+    }
+
+    function doGoNext() {
+      if (!currentSelected) return;
+      const { index, name } = currentSelected;
+
+      hideDecision();
+      playElimSound();
+
+      // Capture values before the fall animation
+      const selectedIndex = index;
+      const selectedName = name;
+      currentSelected = null;
+
+      // Play the fall-off animation, then do the actual elimination
+      startFallAnimation(() => {
+        completeElimination(selectedIndex, selectedName);
+      });
+    }
+
+    function completeElimination(index, name) {
+      const position = eliminationOrder.length + 1;
+      const positionScore = position * 10;
+      const challengePenalty = challengeUsedThisRound.has(name) ? -10 : 0;
+      const totalForRound = positionScore + challengePenalty;
+
+      eliminationOrder.push({
+        name,
+        position,
+        positionScore,
+        challengePenalty,
+        totalForRound
+      });
+
+      tournamentScores[name] = (tournamentScores[name] || 0) + totalForRound;
+
+      items.splice(index, 1);
+      colors.splice(index, 1);
+
+      renderList();
+      drawWheel();
+      updateStatus();
+      renderScoreboard();
+      renderTournamentTotals();
+
+      const winnerBox = document.getElementById('winnerBox');
+      document.getElementById('winnerText').textContent = `${name} is out! (+${positionScore}${challengePenalty ? ' ' + challengePenalty : ''} pts)`;
+      winnerBox.style.display = '';
+
+      // Celebrate the elimination
+      celebrate(false);
+
+      if (items.length === 1) {
+        const winner = items[0];
+        const winnerPosition = eliminationOrder.length + 1;
+        const winnerPositionScore = winnerPosition * 10;
+        const winnerChallengePenalty = challengeUsedThisRound.has(winner) ? -10 : 0;
+        const winnerTotal = winnerPositionScore + winnerChallengePenalty;
+
+        eliminationOrder.push({
+          name: winner,
+          position: winnerPosition,
+          positionScore: winnerPositionScore,
+          challengePenalty: winnerChallengePenalty,
+          totalForRound: winnerTotal,
+          isWinner: true
+        });
+
+        tournamentScores[winner] = (tournamentScores[winner] || 0) + winnerTotal;
+
+        roundComplete = true;
+
+        renderScoreboard();
+        renderTournamentTotals();
+
+        roundHistory.push({
+          roundNumber,
+          results: [...eliminationOrder]
+        });
+
+        setTimeout(() => {
+          celebrate(true);
+          document.getElementById('winnerText').textContent = `${winner} wins Round ${roundNumber}!`;
+          winnerBox.classList.add('celebrating');
+          showRoundOverlay(winner);
+        }, 800);
+
+        document.getElementById('spinBtn').disabled = true;
+        updatePlayAgainBtn();
+      } else if (items.length === 0) {
+        document.getElementById('spinBtn').disabled = true;
+      } else {
+        document.getElementById('spinBtn').disabled = false;
+      }
+    }
+
+    // ---- Scoreboard ----
+    function renderScoreboard() {
+      const stack = document.getElementById('scoreStack');
+
+      if (eliminationOrder.length === 0) {
+        stack.innerHTML = '';
+        return;
+      }
+
+      stack.innerHTML = eliminationOrder.map(entry => {
+        const isWinner = entry.isWinner;
+        const cls = isWinner ? 'winner' : 'eliminated';
+        const ptsClass = entry.totalForRound >= 0 ? 'positive' : 'negative';
+        const penaltyStr = entry.challengePenalty ? ` (${entry.challengePenalty} challenge)` : '';
+        return `
+          <div class="score-entry ${cls}">
+            <span class="name">${isWinner ? '\u{1F451} ' : ''}${escapeHtml(entry.name)}</span>
+            <span>
+              <span class="points ${ptsClass}">${entry.totalForRound > 0 ? '+' : ''}${entry.totalForRound}</span>
+              <span class="detail">${penaltyStr}</span>
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTournamentTotals() {
+      const container = document.getElementById('tournamentTotals');
+      const list = document.getElementById('totalsList');
+
+      const entries = Object.entries(tournamentScores).filter(([_, v]) => v !== 0 || roundHistory.length > 0);
+      if (entries.length === 0 && roundHistory.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+
+      container.style.display = '';
+
+      const sorted = Object.entries(tournamentScores)
+        .sort((a, b) => b[1] - a[1]);
+
+      list.innerHTML = sorted.map(([name, pts]) => `
+        <div class="total-entry">
+          <span class="name">${escapeHtml(name)}</span>
+          <span class="total-pts">${pts} pts</span>
+        </div>
+      `).join('');
+    }
+
+    // ---- Round overlay ----
+    function showRoundOverlay(winner) {
+      const overlay = document.getElementById('roundOverlay');
+      document.getElementById('overlayTitle').textContent = `${winner} Wins!`;
+      document.getElementById('overlayRoundLabel').textContent = `Round ${roundNumber} Complete`;
+
+      const reversed = [...eliminationOrder].reverse();
+      document.getElementById('overlayScores').innerHTML = reversed.map(entry => {
+        const isWinner = entry.isWinner;
+        const cls = isWinner ? 'winner' : 'eliminated';
+        const ptsClass = entry.totalForRound >= 0 ? 'positive' : 'negative';
+        const penaltyStr = entry.challengePenalty ? ` (${entry.challengePenalty} challenge)` : '';
+        return `
+          <div class="score-entry ${cls}">
+            <span class="name">${isWinner ? '\u{1F451} ' : ''}${escapeHtml(entry.name)}</span>
+            <span>
+              <span class="points ${ptsClass}">${entry.totalForRound > 0 ? '+' : ''}${entry.totalForRound}</span>
+              <span class="detail">${penaltyStr}</span>
+            </span>
+          </div>
+        `;
+      }).join('');
+
+      overlay.classList.add('show');
+    }
+
+    function closeOverlay() {
+      document.getElementById('roundOverlay').classList.remove('show');
+      // "Play Next Round" button is already visible via updatePlayAgainBtn
+    }
+
+    function playAgain() {
+      document.getElementById('roundOverlay').classList.remove('show');
+      stopConfetti();
+
+      items = [...allPlayers];
+      eliminationOrder = [];
+      challengeUsedThisRound = new Set();
+      roundComplete = false;
+      roundNumber++;
+      currentSelected = null;
+      revealState = null;
+      highlightState = null;
+
+      generateColors();
+      renderList();
+      drawWheel();
+      updateStatus();
+      renderScoreboard();
+      renderTournamentTotals();
+      updatePlayAgainBtn();
+
+      document.getElementById('winnerBox').style.display = 'none';
+      document.getElementById('spinBtn').disabled = items.length < 2;
+    }
+
+    // ---- Init ----
+    renderList();
+    drawWheel();
+    updateStatus();
+    renderScoreboard();
+    renderTournamentTotals();
+    updatePlayAgainBtn();
+  </script>
+</body>
+</html>
