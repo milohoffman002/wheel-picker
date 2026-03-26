@@ -526,7 +526,7 @@
       <!-- Left: Player setup -->
       <div class="panel setup-panel">
         <label for="itemInput">Players (one per line)</label>
-        <textarea id="itemInput" placeholder="Alice&#10;Bob&#10;Charlie&#10;Diana"></textarea>
+        <textarea id="itemInput" placeholder="[4]&#10;Alice, 70&#10;Bob, 50&#10;Charlie, 50&#10;Diana, 30"></textarea>
 
         <div class="btn-row">
           <button class="btn-primary" onclick="addItems()">Add Players</button>
@@ -564,6 +564,7 @@
             <div class="decision-buttons" id="decisionButtons">
               <button class="btn-challenge" id="challengeBtn" onclick="doChallenge()">Challenge</button>
               <button class="btn-go-next" onclick="doGoNext()">Go Next</button>
+              <button class="btn-secondary" onclick="doSkip()">Skip</button>
             </div>
             <div class="challenge-result" id="challengeResult">
               <button class="btn-won" onclick="challengeWon()">WON</button>
@@ -736,6 +737,36 @@
       osc.stop(now + 0.4);
     }
 
+    function playWhompWhomp() {
+      if (!document.getElementById('soundToggle').checked) return;
+      if (!audioContext) initAudio();
+      const now = audioContext.currentTime;
+      // First "whomp"
+      const osc1 = audioContext.createOscillator();
+      const gain1 = audioContext.createGain();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(200, now);
+      osc1.frequency.exponentialRampToValueAtTime(120, now + 0.3);
+      gain1.gain.setValueAtTime(0.2, now);
+      gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+      osc1.connect(gain1);
+      gain1.connect(audioContext.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.3);
+      // Second "whomp" (lower)
+      const osc2 = audioContext.createOscillator();
+      const gain2 = audioContext.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(150, now + 0.35);
+      osc2.frequency.exponentialRampToValueAtTime(80, now + 0.75);
+      gain2.gain.setValueAtTime(0.2, now + 0.35);
+      gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.75);
+      osc2.connect(gain2);
+      gain2.connect(audioContext.destination);
+      osc2.start(now + 0.35);
+      osc2.stop(now + 0.75);
+    }
+
     function playChallengeWinSound() {
       if (!document.getElementById('soundToggle').checked) return;
       if (!audioContext) initAudio();
@@ -840,23 +871,65 @@
       const lines = input.value.split('\n').map(s => s.trim()).filter(s => s);
       if (lines.length === 0) return;
 
-      items = [...items, ...lines];
+      // Check for a round number prefix like [4]
+      let loadedRound = 0;
+      let startIdx = 0;
+      const roundMatch = lines[0].match(/^\[(\d+)\]$/);
+      if (roundMatch) {
+        loadedRound = parseInt(roundMatch[1], 10);
+        startIdx = 1;
+      }
+
+      // Parse player names and optional scores
+      const newPlayers = [];
+      const loadedScores = {};
+      for (let i = startIdx; i < lines.length; i++) {
+        const commaIdx = lines[i].lastIndexOf(',');
+        if (commaIdx > 0) {
+          const namePart = lines[i].substring(0, commaIdx).trim();
+          const scorePart = lines[i].substring(commaIdx + 1).trim();
+          const scoreNum = Number(scorePart);
+          if (namePart && !isNaN(scoreNum)) {
+            newPlayers.push(namePart);
+            loadedScores[namePart] = scoreNum;
+            continue;
+          }
+        }
+        // No valid comma+number — treat entire line as a name
+        newPlayers.push(lines[i]);
+      }
+
+      if (newPlayers.length === 0) return;
+
+      items = [...items, ...newPlayers];
       allPlayers = [...items];
       input.value = '';
 
-      allPlayers.forEach(p => {
-        if (!(p in tournamentScores)) tournamentScores[p] = 0;
-      });
+      // If loading a tournament, set round number and pre-fill scores
+      if (loadedRound > 0) {
+        roundNumber = loadedRound;
+        // Reset tournament scores and apply loaded values
+        tournamentScores = {};
+        allPlayers.forEach(p => {
+          tournamentScores[p] = loadedScores[p] || 0;
+        });
+      } else {
+        allPlayers.forEach(p => {
+          if (!(p in tournamentScores)) tournamentScores[p] = 0;
+        });
+        roundNumber = Math.max(roundNumber, 1);
+      }
 
       eliminationOrder = [];
       challengeUsedThisRound = new Set();
       roundComplete = false;
-      roundNumber = Math.max(roundNumber, 1);
 
       generateColors();
       renderList();
       drawWheel();
       updateStatus();
+      renderScoreboard();
+      renderTournamentTotals();
       updatePlayAgainBtn();
     }
 
@@ -1411,10 +1484,76 @@
       });
     }
 
+    function doSkip() {
+      if (!currentSelected) return;
+      const { index, name } = currentSelected;
+
+      hideDecision();
+      playWhompWhomp();
+      currentSelected = null;
+
+      startFallAnimation(() => {
+        // Remove from wheel without scoring
+        items.splice(index, 1);
+        colors.splice(index, 1);
+
+        renderList();
+        drawWheel();
+        updateStatus();
+
+        const winnerBox = document.getElementById('winnerBox');
+        document.getElementById('winnerText').textContent = `${name} skipped (absent)`;
+        winnerBox.style.display = '';
+
+        // Check if only one player remains — they win
+        if (items.length === 1) {
+          const winner = items[0];
+          const winnerPosition = eliminationOrder.length + 1;
+          const winnerPositionScore = winnerPosition * 10 + 10;
+          const winnerChallengePenalty = challengeUsedThisRound.has(winner) ? -5 : 0;
+          const winnerTotal = winnerPositionScore + winnerChallengePenalty;
+
+          eliminationOrder.push({
+            name: winner,
+            position: winnerPosition,
+            positionScore: winnerPositionScore,
+            challengePenalty: winnerChallengePenalty,
+            totalForRound: winnerTotal,
+            isWinner: true
+          });
+
+          tournamentScores[winner] = (tournamentScores[winner] || 0) + winnerTotal;
+
+          roundComplete = true;
+          renderScoreboard();
+          renderTournamentTotals();
+
+          roundHistory.push({
+            roundNumber,
+            results: [...eliminationOrder]
+          });
+
+          setTimeout(() => {
+            celebrate(true);
+            document.getElementById('winnerText').textContent = `${winner} wins Round ${roundNumber}!`;
+            winnerBox.classList.add('celebrating');
+            showRoundOverlay(winner);
+          }, 800);
+
+          document.getElementById('spinBtn').disabled = true;
+          updatePlayAgainBtn();
+        } else if (items.length === 0) {
+          document.getElementById('spinBtn').disabled = true;
+        } else {
+          document.getElementById('spinBtn').disabled = false;
+        }
+      });
+    }
+
     function completeElimination(index, name) {
       const position = eliminationOrder.length + 1;
       const positionScore = position * 10;
-      const challengePenalty = challengeUsedThisRound.has(name) ? -10 : 0;
+      const challengePenalty = challengeUsedThisRound.has(name) ? -5 : 0;
       const totalForRound = positionScore + challengePenalty;
 
       eliminationOrder.push({
@@ -1446,8 +1585,8 @@
       if (items.length === 1) {
         const winner = items[0];
         const winnerPosition = eliminationOrder.length + 1;
-        const winnerPositionScore = winnerPosition * 10;
-        const winnerChallengePenalty = challengeUsedThisRound.has(winner) ? -10 : 0;
+        const winnerPositionScore = winnerPosition * 10 + 10;
+        const winnerChallengePenalty = challengeUsedThisRound.has(winner) ? -5 : 0;
         const winnerTotal = winnerPositionScore + winnerChallengePenalty;
 
         eliminationOrder.push({
